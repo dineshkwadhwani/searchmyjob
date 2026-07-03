@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { Button, Card, PageHeader, Badge, EmptyState, MatchScoreRing } from '../../components/ui'
 import type { JobResult, JobRun, SearchConfig, MatchResult, FeatureConfig } from '../../types'
-import { formatDate, TIME_FRAME_OPTIONS } from '../../lib/constants'
+import { formatDate, formatDateTime, TIME_FRAME_OPTIONS } from '../../lib/constants'
 
 let pdfjsLibPromise: Promise<typeof import('pdfjs-dist')> | null = null
 function loadPdfjs() {
@@ -93,26 +93,44 @@ export default function SearchPage() {
 
   function subscribeToRun(runId: string) {
     setRunning(true)
+    let settled = false
+
+    async function handleTerminal(updated: JobRun) {
+      if (settled || (updated.status !== 'completed' && updated.status !== 'failed')) return
+      settled = true
+      clearInterval(fallbackPoll)
+      channel.unsubscribe()
+      setCurrentRun(updated)
+      if (updated.status === 'completed') {
+        await loadJobs(runId)
+        await refreshProfile()
+        setRunning(false)
+        const count = updated.result_count ?? 0
+        toast.success(count > 0 ? `Search complete — found ${count} job${count === 1 ? '' : 's'}!` : 'Search complete — no jobs matched this time.')
+      } else {
+        toast.error(updated.error_message ?? 'Search failed. Please try again.')
+        setRunning(false)
+      }
+    }
+
     const channel = supabase.channel(`run-${runId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'job_runs', filter: `id=eq.${runId}` },
-        async (payload) => {
-          const updated = payload.new as JobRun
-          setCurrentRun(updated)
-          if (updated.status === 'completed') {
-            await loadJobs(runId)
-            await refreshProfile()
-            setRunning(false)
-            channel.unsubscribe()
-            const count = updated.result_count ?? 0
-            toast.success(count > 0 ? `Search complete — found ${count} job${count === 1 ? '' : 's'}!` : 'Search complete — no jobs matched this time.')
-          }
-          if (updated.status === 'failed') {
-            toast.error(updated.error_message ?? 'Search failed. Please try again.')
-            setRunning(false)
-            channel.unsubscribe()
-          }
+        (payload) => handleTerminal(payload.new as JobRun)
+      )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Realtime subscription issue for job_runs:', status)
         }
-      ).subscribe()
+      })
+
+    // Safety net: realtime delivery can occasionally drop a broadcast. Poll
+    // as a fallback so the UI can never get stuck if that happens — realtime
+    // still wins the race and resolves this immediately in the normal case.
+    const fallbackPoll = setInterval(async () => {
+      if (settled) { clearInterval(fallbackPoll); return }
+      const { data: latest } = await supabase.from('job_runs').select('*').eq('id', runId).single()
+      if (latest) await handleTerminal(latest as JobRun)
+    }, 15000)
   }
 
   async function runSearch() {
@@ -125,6 +143,7 @@ export default function SearchPage() {
     }
     setRunning(true)
     setStage('connecting')
+    setJobs([])
     const { data, error: fnErr } = await supabase.functions.invoke('run-search', { body: { config_id: config.id } })
     if (fnErr || data?.error) {
       toast.error(data?.error ?? fnErr?.message ?? 'Failed to start search')
@@ -300,7 +319,7 @@ export default function SearchPage() {
             <div className="flex items-center gap-2">
               <span className="text-sm text-slate-400">{jobs.length} jobs found</span>
               {currentRun?.completed_at && (
-                <Badge label={`Last run ${formatDate(currentRun.completed_at)}`} variant="gray" />
+                <Badge label={`Last run ${formatDateTime(currentRun.completed_at)}`} variant="gray" />
               )}
             </div>
             {config?.platform === 'all' && (
