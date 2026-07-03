@@ -1,4 +1,4 @@
-# JobHunt AI — Claude Code Context
+# SearchMyJob AI — Claude Code Context
 
 ## What This App Is
 A modern, AI-driven job search SaaS application built for Indian job seekers. Users can search LinkedIn and Naukri simultaneously via Apify actors, match their resume to job descriptions using Groq AI, and get their resume customized for specific roles. Credits are purchased via Razorpay.
