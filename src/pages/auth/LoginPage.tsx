@@ -43,7 +43,7 @@ export default function LoginPage() {
             AI-powered job search across LinkedIn and Naukri. Match your resume, customize for each role, and land interviews faster.
           </p>
           <div className="mt-10 grid grid-cols-3 gap-4">
-            {[{label:'Jobs Found',value:'10K+'},{label:'Match Accuracy',value:'94%'},{label:'Time Saved',value:'5hrs'}].map(s=>(
+            {[{label:'Jobs Found',value:'10K+'},{label:'Match Accuracy',value:'94%'},{label:'Time Saved',value:'99%'}].map(s=>(
               <div key={s.label} className="glass rounded-2xl p-4">
                 <p className="text-2xl font-bold text-violet-300">{s.value}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
@@ -64,7 +64,7 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-100 mb-1">Welcome back</h2>
+            <h2 className="text-2xl font-bold text-slate-100 mb-1">Welcome to SearchMyJob AI</h2>
             <p className="text-slate-500 text-sm">Sign in to continue your job search</p>
           </div>
 
