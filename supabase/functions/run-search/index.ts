@@ -35,9 +35,10 @@ serve(async (req) => {
 
     // Get search config
     const { config_id } = await req.json()
+    if (!config_id) return Response.json({ error: 'config_id required' }, { headers: corsHeaders })
     const { data: config } = await supabase.from('search_config').select('*')
-      .eq('user_id', user.id).single()
-    if (!config) return Response.json({ error: 'No search config found' }, { headers: corsHeaders })
+      .eq('id', config_id).eq('user_id', user.id).single()
+    if (!config) return Response.json({ error: 'Search config not found' }, { headers: corsHeaders })
 
     // Check premium credits
     const { data: features } = await supabase.from('feature_config').select('*')
@@ -55,6 +56,7 @@ serve(async (req) => {
     // Create job_run record
     const { data: newRun } = await supabase.from('job_runs').insert({
       user_id: user.id,
+      search_config_id: config.id,
       status: 'running',
       platform: config.platform,
       credits_charged: totalCost,

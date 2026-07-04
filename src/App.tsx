@@ -10,6 +10,7 @@ import RegisterPage from './pages/auth/RegisterPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage'
 import TermsOfServicePage from './pages/legal/TermsOfServicePage'
+import DashboardPage from './pages/jobseeker/DashboardPage'
 import SearchPage from './pages/jobseeker/SearchPage'
 import JobBucketPage from './pages/jobseeker/JobBucketPage'
 import WalletPage from './pages/jobseeker/WalletPage'
@@ -102,7 +103,8 @@ function AppRoutes() {
           </>
         ) : (
           <>
-            <Route path="/" element={<Navigate to="/search" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/job-bucket" element={<JobBucketPage />} />
             <Route path="/wallet" element={<WalletPage />} />
@@ -112,7 +114,7 @@ function AppRoutes() {
             <Route path="/settings/search" element={<SearchSettings />} />
             <Route path="/settings/apify" element={<ApifySettings />} />
             <Route path="/settings/groq" element={<GroqSettings />} />
-            <Route path="*" element={<Navigate to="/search" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </>
         )}
       </Routes>

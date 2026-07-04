@@ -3,7 +3,7 @@ export type RunStatus = 'pending' | 'running' | 'completed' | 'failed'
 export type SearchPlatform = 'linkedin' | 'naukri' | 'all'
 export type TimeFrame = 'r86400' | 'r172800' | 'r604800' | 'r1296000'
 export type FeatureName = 'search' | 'apply' | 'match' | 'customize' | 'all_platforms'
-export type CreditTxType = 'topup' | 'search' | 'apply' | 'match' | 'customize' | 'refund' | 'admin_grant'
+export type CreditTxType = 'topup' | 'search' | 'apply' | 'match' | 'customize' | 'refund' | 'admin_grant' | 'signup_bonus'
 
 export interface Profile {
   id: string
@@ -20,6 +20,7 @@ export interface Profile {
 export interface SearchConfig {
   id: string
   user_id: string
+  name: string
   job_titles: string[]
   locations: string[]
   skills: string[]        // ← fixed: was string
@@ -32,6 +33,7 @@ export interface SearchConfig {
 export interface JobRun {
   id: string
   user_id: string
+  search_config_id?: string
   status: RunStatus
   platform: SearchPlatform
   apify_run_id?: string

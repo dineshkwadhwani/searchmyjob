@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Search, Briefcase, FileText, Wallet,
   Users, Key, Sliders, LogOut, Menu, X,
-  Sparkles, ChevronRight, Coins,
+  Sparkles, ChevronRight, Coins, LayoutDashboard,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
@@ -15,6 +15,7 @@ const adminNav = [
 ]
 
 const jobseekerNav = [
+  { to: '/dashboard',   label: 'Dashboard',        icon: <LayoutDashboard className="w-4 h-4" />, isPremium: false },
   { to: '/search',      label: 'Search Jobs',      icon: <Search className="w-4 h-4" />,   isPremium: false },
   { to: '/job-bucket',  label: 'Job Bucket',        icon: <Briefcase className="w-4 h-4" />,isPremium: false },
   { to: '/wallet',      label: 'Wallet',            icon: <Wallet className="w-4 h-4" />,   isPremium: false },

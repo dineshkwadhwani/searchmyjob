@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search, Zap, ExternalLink, BookmarkPlus, Brain, Wand2,
-  Clock, MapPin, Building2, Globe2, Loader2, ChevronRight
+  Clock, MapPin, Building2, Globe2, Loader2, ChevronRight, Plus
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { Button, Card, PageHeader, Badge, EmptyState, MatchScoreRing } from '../../components/ui'
 import type { JobResult, JobRun, SearchConfig, MatchResult, FeatureConfig } from '../../types'
-import { formatDate, formatDateTime, TIME_FRAME_OPTIONS } from '../../lib/constants'
+import { formatDate, formatDateTime, TIME_FRAME_OPTIONS, MAX_SEARCH_CONFIGS } from '../../lib/constants'
 import { extractPdfText } from '../../lib/pdf'
 
 
@@ -18,11 +18,12 @@ type JobWithMatch = JobResult & { matchResult?: MatchResult; platform?: string }
 export default function SearchPage() {
   const { profile, refreshProfile } = useAuth()
   const navigate = useNavigate()
-  const [config, setConfig] = useState<SearchConfig | null>(null)
+  const [configs, setConfigs] = useState<SearchConfig[]>([])
   const [currentRun, setCurrentRun] = useState<JobRun | null>(null)
   const [jobs, setJobs] = useState<JobWithMatch[]>([])
   const [features, setFeatures] = useState<FeatureConfig[]>([])
   const [running, setRunning] = useState(false)
+  const [runningConfigId, setRunningConfigId] = useState<string | null>(null)
   const [stage, setStage] = useState<'connecting' | 'connected' | 'waiting'>('connecting')
   const [platformFilter, setPlatformFilter] = useState<string>('all')
   const [matchingId, setMatchingId] = useState<string | null>(null)
@@ -41,13 +42,13 @@ export default function SearchPage() {
 
   async function init() {
     if (!profile) return
-    await Promise.all([loadConfig(), loadFeatures(), loadLatestRun()])
+    await Promise.all([loadConfigs(), loadFeatures(), loadLatestRun()])
   }
 
-  async function loadConfig() {
+  async function loadConfigs() {
     if (!profile) return
-    const { data } = await supabase.from('search_config').select('*').eq('user_id', profile.id).single()
-    setConfig(data as SearchConfig | null)
+    const { data } = await supabase.from('search_config').select('*').eq('user_id', profile.id).order('created_at')
+    setConfigs((data ?? []) as SearchConfig[])
   }
 
   async function loadFeatures() {
@@ -64,6 +65,7 @@ export default function SearchPage() {
       if (run.status === 'completed') await loadJobs(run.id)
       if (run.status === 'running' || run.status === 'pending') {
         setStage('waiting')
+        setRunningConfigId(run.search_config_id ?? null)
         subscribeToRun(run.id)
       }
     }
@@ -95,11 +97,13 @@ export default function SearchPage() {
         await loadJobs(runId)
         await refreshProfile()
         setRunning(false)
+        setRunningConfigId(null)
         const count = updated.result_count ?? 0
         toast.success(count > 0 ? `Search complete — found ${count} job${count === 1 ? '' : 's'}!` : 'Search complete — no jobs matched this time.')
       } else {
         toast.error(updated.error_message ?? 'Search failed. Please try again.')
         setRunning(false)
+        setRunningConfigId(null)
       }
     }
 
@@ -123,8 +127,8 @@ export default function SearchPage() {
     }, 15000)
   }
 
-  async function runSearch() {
-    if (!profile || !config) return
+  async function runSearch(config: SearchConfig) {
+    if (!profile || running) return
     if (!profile.apify_key_encrypted) { navigate('/settings/apify'); return }
     const allPlatformCost = features.find(f => f.feature === 'all_platforms')?.credit_cost ?? 20
     if (config.platform === 'all' && profile.wallet_credits < allPlatformCost) {
@@ -132,12 +136,13 @@ export default function SearchPage() {
       return
     }
     setRunning(true)
+    setRunningConfigId(config.id)
     setStage('connecting')
     setJobs([])
     const { data, error: fnErr } = await supabase.functions.invoke('run-search', { body: { config_id: config.id } })
     if (fnErr || data?.error) {
       toast.error(data?.error ?? fnErr?.message ?? 'Failed to start search')
-      setRunning(false); return
+      setRunning(false); setRunningConfigId(null); return
     }
     setStage('connected')
     toast.success('Connected to Apify — search started')
@@ -193,52 +198,45 @@ export default function SearchPage() {
   }
 
   const filteredJobs = platformFilter === 'all' ? jobs : jobs.filter(j => (j as any).platform === platformFilter)
-  const configMissing = !config || (config.job_titles?.length ?? 0) === 0
+  const runningConfig = configs.find(c => c.id === runningConfigId)
+  const lastRunConfig = configs.find(c => c.id === currentRun?.search_config_id)
 
   return (
     <div>
       <PageHeader
         title="Search Jobs"
-        description="AI-powered search across LinkedIn and Naukri"
+        description="AI-powered search across LinkedIn and Naukri — save up to 3 searches and run any of them"
         action={
-          <Button onClick={runSearch} loading={running} size="lg" disabled={configMissing || running}>
-            {running ? <><Loader2 className="w-4 h-4 animate-spin" /> Searching...</> : <><Zap className="w-4 h-4" /> Search My Jobs</>}
+          <Button variant="ghost" onClick={() => navigate('/settings/search')}>
+            Manage Searches <ChevronRight className="w-3.5 h-3.5" />
           </Button>
         }
       />
 
-      {config && !configMissing && (
-        <Card className="mb-6">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center gap-2 text-sm">
-              <Search className="w-4 h-4 text-violet-400" />
-              <span className="text-slate-500">Roles:</span>
-              <div className="flex gap-1 flex-wrap">
-                {config.job_titles.map(t => <Badge key={t} label={t} variant="purple" />)}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="w-4 h-4 text-violet-400" />
-              {config.locations.map(l => <Badge key={l} label={l} variant="gray" />)}
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4 text-violet-400" />
-              <span className="text-slate-500">{TIME_FRAME_OPTIONS.find(t => t.value === config.time_frame)?.label}</span>
-            </div>
-            <button onClick={() => navigate('/settings/search')} className="ml-auto text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1">
-              Edit <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-        </Card>
-      )}
-
-      {configMissing && (
+      {configs.length === 0 ? (
         <EmptyState
           icon={<Search className="w-7 h-7" />}
-          title="Configure your search first"
+          title="Configure your first search"
           description="Set up your roles, locations and preferences before running a search."
           action={<Button onClick={() => navigate('/settings/search')}>Configure Search</Button>}
         />
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {configs.map(cfg => (
+            <SearchConfigTile key={cfg.id} config={cfg}
+              isRunning={running && runningConfigId === cfg.id}
+              disabled={running}
+              onSearch={() => runSearch(cfg)}
+            />
+          ))}
+          {configs.length < MAX_SEARCH_CONFIGS && (
+            <button onClick={() => navigate('/settings/search')}
+              className="rounded-2xl border-2 border-dashed border-slate-700 hover:border-violet-500/50 flex flex-col items-center justify-center gap-2 p-6 text-slate-500 hover:text-violet-400 transition-all min-h-[180px]">
+              <Plus className="w-6 h-6" />
+              <span className="text-sm font-medium">Add Another Search</span>
+            </button>
+          )}
+        </div>
       )}
 
       {running && (
@@ -254,7 +252,7 @@ export default function SearchPage() {
                 {stage === 'waiting' && 'Getting search results...'}
               </p>
               <p className="text-sm text-slate-500 mt-0.5">
-                Scraping {config?.platform === 'all' ? 'LinkedIn & Naukri' : config?.platform} · Running for {formatElapsed(elapsed)}
+                {runningConfig?.name ?? 'Search'} · Scraping {runningConfig?.platform === 'all' ? 'LinkedIn & Naukri' : runningConfig?.platform} · Running for {formatElapsed(elapsed)}
               </p>
             </div>
             <div className="ml-auto flex items-center gap-2">
@@ -300,11 +298,12 @@ export default function SearchPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-slate-400">{jobs.length} jobs found</span>
+              {lastRunConfig && <Badge label={lastRunConfig.name} variant="purple" />}
               {currentRun?.completed_at && (
                 <Badge label={`Last run ${formatDateTime(currentRun.completed_at)}`} variant="gray" />
               )}
             </div>
-            {config?.platform === 'all' && (
+            {currentRun?.platform === 'all' && (
               <div className="flex gap-2">
                 {['all', 'linkedin', 'naukri'].map(p => (
                   <button key={p} onClick={() => setPlatformFilter(p)}
@@ -336,9 +335,43 @@ export default function SearchPage() {
           icon={<Search className="w-7 h-7" />}
           title="No jobs found"
           description="Try different roles, locations, or a wider time frame."
-          action={<Button variant="secondary" onClick={runSearch}>Search Again</Button>}
+          action={lastRunConfig ? <Button variant="secondary" onClick={() => runSearch(lastRunConfig)}>Search Again</Button> : undefined}
         />
       )}
+    </div>
+  )
+}
+
+function SearchConfigTile({ config, isRunning, disabled, onSearch }: {
+  config: SearchConfig; isRunning: boolean; disabled: boolean; onSearch: () => void
+}) {
+  return (
+    <div className="glass-card p-5 flex flex-col">
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <h3 className="font-semibold text-slate-100 text-sm truncate">{config.name}</h3>
+        {config.platform === 'all' && <Badge label="All Platforms" variant="premium" />}
+      </div>
+      <div className="space-y-2 text-xs flex-1">
+        <div className="flex items-start gap-1.5 flex-wrap">
+          <Search className="w-3.5 h-3.5 text-violet-400 flex-shrink-0 mt-0.5" />
+          <div className="flex gap-1 flex-wrap">
+            {config.job_titles.map(t => <Badge key={t} label={t} variant="purple" />)}
+          </div>
+        </div>
+        <div className="flex items-start gap-1.5 flex-wrap">
+          <MapPin className="w-3.5 h-3.5 text-violet-400 flex-shrink-0 mt-0.5" />
+          <div className="flex gap-1 flex-wrap">
+            {config.locations.map(l => <Badge key={l} label={l} variant="gray" />)}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 text-slate-500">
+          <Clock className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+          <span>{TIME_FRAME_OPTIONS.find(t => t.value === config.time_frame)?.label}</span>
+        </div>
+      </div>
+      <Button onClick={onSearch} loading={isRunning} disabled={disabled} className="w-full mt-4">
+        {isRunning ? <><Loader2 className="w-4 h-4 animate-spin" /> Searching...</> : <><Zap className="w-4 h-4" /> Search Now</>}
+      </Button>
     </div>
   )
 }

@@ -27,6 +27,7 @@ export const NAUKRI_ACTOR   = 'dineshwadhwani/naukri-job-scrapper'
 export const MAX_ROLES     = 3
 export const MAX_LOCATIONS = 3
 export const MAX_SKILLS    = 3
+export const MAX_SEARCH_CONFIGS = 3
 export const MAX_RESUME_SIZE_BYTES = 1024 * 1024 // 1MB
 
 // Base rate: ₹10 per credit, before any pack discount.

@@ -363,7 +363,7 @@ export function AdminUsersPage() {
               {ledger.map(entry => (
                 <div key={entry.id} className="flex items-center gap-3 py-3 border-b border-slate-800/60 last:border-0">
                   <div className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center flex-shrink-0">
-                    {['topup', 'admin_grant', 'refund'].includes(entry.type)
+                    {['topup', 'admin_grant', 'refund', 'signup_bonus'].includes(entry.type)
                       ? <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
                       : <TrendingDown className="w-3.5 h-3.5 text-red-400" />}
                   </div>

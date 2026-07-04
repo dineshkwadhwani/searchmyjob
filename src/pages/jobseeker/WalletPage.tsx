@@ -79,12 +79,12 @@ export default function WalletPage() {
   }
 
   const txIcon = (type: string) => {
-    if (['topup', 'admin_grant', 'refund'].includes(type)) return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+    if (['topup', 'admin_grant', 'refund', 'signup_bonus'].includes(type)) return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
     return <TrendingDown className="w-3.5 h-3.5 text-red-400" />
   }
 
   const txBadgeVariant = (type: string): any => {
-    const m: Record<string, string> = { topup: 'green', admin_grant: 'green', refund: 'green', search: 'purple', apply: 'gray', match: 'blue', customize: 'premium' }
+    const m: Record<string, string> = { topup: 'green', admin_grant: 'green', refund: 'green', signup_bonus: 'green', search: 'purple', apply: 'gray', match: 'blue', customize: 'premium' }
     return m[type] ?? 'gray'
   }
 

@@ -3,9 +3,9 @@ import { Upload, FileText, Trash2, ExternalLink, Eye, EyeOff, Save, AlertCircle,
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
-import { Button, Card, PageHeader, Input, Select, TagInput, Badge } from '../../components/ui'
+import { Button, Card, PageHeader, Input, Select, TagInput, Badge, PageLoading } from '../../components/ui'
 import type { Resume, SearchConfig, AffiliateKey, FeatureConfig } from '../../types'
-import { TIME_FRAME_OPTIONS, PLATFORM_OPTIONS, MAX_RESUME_SIZE_BYTES, formatDate } from '../../lib/constants'
+import { TIME_FRAME_OPTIONS, PLATFORM_OPTIONS, MAX_RESUME_SIZE_BYTES, MAX_SEARCH_CONFIGS, formatDate } from '../../lib/constants'
 
 // ─────────────────────────────────────────
 // RESUME SETTINGS
@@ -117,18 +117,26 @@ export function ResumeSettings() {
 // ─────────────────────────────────────────
 export function SearchSettings() {
   const { profile } = useAuth()
-  const [config, setConfig] = useState<Partial<SearchConfig>>({
-    job_titles: [], locations: [], skills: [], time_frame: 'r86400', platform: 'linkedin'
-  })
+  const [configs, setConfigs] = useState<Partial<SearchConfig>[]>([])
+  const [activeIndex, setActiveIndex] = useState(0)
   const [features, setFeatures] = useState<FeatureConfig[]>([])
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => { loadConfig(); loadFeatures() }, [profile])
+  useEffect(() => { loadConfigs(); loadFeatures() }, [profile])
 
-  async function loadConfig() {
+  function blankConfig(): Partial<SearchConfig> {
+    return { job_titles: [], locations: [], skills: [], time_frame: 'r86400', platform: 'linkedin', name: '' }
+  }
+
+  async function loadConfigs() {
     if (!profile) return
-    const { data } = await supabase.from('search_config').select('*').eq('user_id', profile.id).single()
-    if (data) setConfig({ ...data, skills: Array.isArray(data.skills) ? data.skills : [] })
+    const { data } = await supabase.from('search_config').select('*').eq('user_id', profile.id).order('created_at')
+    const loaded = (data ?? []).map(d => ({ ...d, skills: Array.isArray(d.skills) ? d.skills : [] }))
+    setConfigs(loaded.length > 0 ? loaded : [blankConfig()])
+    setActiveIndex(0)
+    setLoading(false)
   }
 
   async function loadFeatures() {
@@ -140,44 +148,110 @@ export function SearchSettings() {
     return features.find(f => f.feature === name)?.credit_cost ?? 0
   }
 
+  function updateActive(patch: Partial<SearchConfig>) {
+    setConfigs(prev => prev.map((c, i) => i === activeIndex ? { ...c, ...patch } : c))
+  }
+
+  function addConfig() {
+    if (configs.length >= MAX_SEARCH_CONFIGS) return
+    setConfigs(prev => [...prev, blankConfig()])
+    setActiveIndex(configs.length)
+  }
+
+  async function handleDelete(index: number) {
+    const draft = configs[index]
+    if (!window.confirm(`Delete "${draft.name || `Search ${index + 1}`}"? This cannot be undone.`)) return
+    if (draft.id) {
+      setDeleting(true)
+      const { error } = await supabase.from('search_config').delete().eq('id', draft.id)
+      setDeleting(false)
+      if (error) { toast.error(error.message); return }
+    }
+    const remaining = configs.filter((_, i) => i !== index)
+    setConfigs(remaining.length > 0 ? remaining : [blankConfig()])
+    setActiveIndex(prev => Math.max(0, prev >= index ? prev - 1 : prev))
+    toast.success('Search config removed')
+  }
+
   async function handleSave() {
     if (!profile) return
-    if ((config.job_titles?.length ?? 0) === 0) { toast.error('Add at least one job role'); return }
-    if ((config.locations?.length ?? 0) === 0) { toast.error('Add at least one location'); return }
+    const draft = configs[activeIndex]
+    if (!draft) return
+    if ((draft.job_titles?.length ?? 0) === 0) { toast.error('Add at least one job role'); return }
+    if ((draft.locations?.length ?? 0) === 0) { toast.error('Add at least one location'); return }
     setSaving(true)
     const payload = {
       user_id: profile.id,
-      job_titles: config.job_titles ?? [],
-      locations: config.locations ?? [],
-      skills: config.skills ?? [],
-      time_frame: config.time_frame ?? 'r86400',
-      platform: config.platform ?? 'linkedin',
+      name: draft.name?.trim() || `Search ${activeIndex + 1}`,
+      job_titles: draft.job_titles ?? [],
+      locations: draft.locations ?? [],
+      skills: draft.skills ?? [],
+      time_frame: draft.time_frame ?? 'r86400',
+      platform: draft.platform ?? 'linkedin',
     }
-    const { error: err } = await supabase.from('search_config').upsert(payload, { onConflict: 'user_id' })
-    setSaving(false)
-    if (err) { toast.error(err.message); return }
-    toast.success('Search config saved!')
+    if (draft.id) {
+      const { error } = await supabase.from('search_config').update(payload).eq('id', draft.id)
+      setSaving(false)
+      if (error) { toast.error(error.message); return }
+      updateActive({ name: payload.name })
+      toast.success('Search config saved!')
+    } else {
+      const { data, error } = await supabase.from('search_config').insert(payload).select().single()
+      setSaving(false)
+      if (error) { toast.error(error.message); return }
+      setConfigs(prev => prev.map((c, i) => i === activeIndex ? (data as SearchConfig) : c))
+      toast.success('Search config created!')
+    }
   }
+
+  if (loading) return <PageLoading />
+
+  const active = configs[activeIndex] ?? blankConfig()
 
   return (
     <div>
-      <PageHeader title="Search Settings" description="Configure your job search preferences" />
+      <PageHeader title="Search Settings" description="Configure up to 3 saved job searches" />
       <div className="max-w-2xl space-y-6">
+        <div className="flex items-center gap-2 flex-wrap">
+          {configs.map((c, i) => (
+            <button key={c.id ?? `draft-${i}`} onClick={() => setActiveIndex(i)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                i === activeIndex
+                  ? 'border-violet-500/50 bg-violet-500/15 text-violet-300'
+                  : 'border-slate-700 bg-slate-800/50 text-slate-500 hover:border-slate-600'
+              }`}>
+              {c.name || `Search ${i + 1}`}{!c.id && <span className="text-slate-600"> (unsaved)</span>}
+            </button>
+          ))}
+          {configs.length < MAX_SEARCH_CONFIGS && (
+            <button onClick={addConfig}
+              className="px-4 py-2 rounded-xl text-sm font-medium border border-dashed border-slate-700 text-slate-500 hover:border-violet-500/50 hover:text-violet-400 transition-all">
+              + Add Search
+            </button>
+          )}
+        </div>
+
+        <Card>
+          <Input label="Search Name" value={active.name ?? ''}
+            onChange={e => updateActive({ name: e.target.value })}
+            placeholder={`e.g. Remote PM Roles`} hint="Shown as the tile name on the Search Jobs page" />
+        </Card>
+
         <Card>
           <h3 className="text-sm font-semibold text-slate-300 mb-4">Target Roles</h3>
-          <TagInput label="Job Titles" tags={config.job_titles ?? []} max={3}
-            onChange={v => setConfig(c => ({ ...c, job_titles: v }))}
+          <TagInput label="Job Titles" tags={active.job_titles ?? []} max={3}
+            onChange={v => updateActive({ job_titles: v })}
             placeholder="e.g. Software Engineer" hint="Press Enter to add · Max 3 roles" />
         </Card>
 
         <Card>
           <h3 className="text-sm font-semibold text-slate-300 mb-4">Locations & Skills</h3>
           <div className="space-y-4">
-            <TagInput label="Locations" tags={config.locations ?? []} max={3}
-              onChange={v => setConfig(c => ({ ...c, locations: v }))}
+            <TagInput label="Locations" tags={active.locations ?? []} max={3}
+              onChange={v => updateActive({ locations: v })}
               placeholder="e.g. Bangalore, Remote" hint="Press Enter to add · Max 3" />
-            <TagInput label="Skills" tags={config.skills ?? []} max={3}
-              onChange={v => setConfig(c => ({ ...c, skills: v }))}
+            <TagInput label="Skills" tags={active.skills ?? []} max={3}
+              onChange={v => updateActive({ skills: v })}
               placeholder="e.g. React, Python" hint="Optional · Max 3 skills" />
           </div>
         </Card>
@@ -185,17 +259,17 @@ export function SearchSettings() {
         <Card>
           <h3 className="text-sm font-semibold text-slate-300 mb-4">Search Preferences</h3>
           <div className="grid sm:grid-cols-2 gap-4">
-            <Select label="Posted Within" value={config.time_frame ?? 'r86400'}
-              onChange={e => setConfig(c => ({ ...c, time_frame: e.target.value as any }))}
+            <Select label="Posted Within" value={active.time_frame ?? 'r86400'}
+              onChange={e => updateActive({ time_frame: e.target.value as any })}
               options={TIME_FRAME_OPTIONS} />
             <div className="space-y-1.5">
               <label className="label">Platform</label>
               <div className="grid grid-cols-3 gap-2">
                 {PLATFORM_OPTIONS.map(p => (
                   <button key={p.value} type="button"
-                    onClick={() => setConfig(c => ({ ...c, platform: p.value as any }))}
+                    onClick={() => updateActive({ platform: p.value as any })}
                     className={`relative px-3 py-3 rounded-xl border text-sm font-medium transition-all text-center ${
-                      config.platform === p.value
+                      active.platform === p.value
                         ? 'border-violet-500/50 bg-violet-500/15 text-violet-300'
                         : 'border-slate-700 bg-slate-800/50 text-slate-500 hover:border-slate-600'
                     }`}>
@@ -208,7 +282,7 @@ export function SearchSettings() {
                   </button>
                 ))}
               </div>
-              {config.platform === 'all' && (
+              {active.platform === 'all' && (
                 <p className="text-xs text-amber-400 flex items-center gap-1 mt-1">
                   ⚡ Costs {getFeatureCost('all_platforms')} extra credits per search
                 </p>
@@ -217,9 +291,16 @@ export function SearchSettings() {
           </div>
         </Card>
 
-        <Button onClick={handleSave} loading={saving} size="lg">
-          <Save className="w-4 h-4" /> Save Search Config
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button onClick={handleSave} loading={saving} size="lg">
+            <Save className="w-4 h-4" /> Save Search Config
+          </Button>
+          {configs.length > 1 && (
+            <Button variant="danger" size="lg" onClick={() => handleDelete(activeIndex)} loading={deleting}>
+              <Trash2 className="w-4 h-4" /> Delete
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )
