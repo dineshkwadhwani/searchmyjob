@@ -10,17 +10,7 @@ import { useAuth } from '../../context/AuthContext'
 import { Button, Card, PageHeader, Badge, EmptyState, MatchScoreRing } from '../../components/ui'
 import type { JobResult, JobRun, SearchConfig, MatchResult, FeatureConfig } from '../../types'
 import { formatDate, formatDateTime, TIME_FRAME_OPTIONS } from '../../lib/constants'
-
-let pdfjsLibPromise: Promise<typeof import('pdfjs-dist')> | null = null
-function loadPdfjs() {
-  if (!pdfjsLibPromise) {
-    pdfjsLibPromise = import('pdfjs-dist').then(lib => {
-      lib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).toString()
-      return lib
-    })
-  }
-  return pdfjsLibPromise
-}
+import { extractPdfText } from '../../lib/pdf'
 
 
 type JobWithMatch = JobResult & { matchResult?: MatchResult; platform?: string }
@@ -183,15 +173,7 @@ export default function SearchPage() {
 
     setMatchingId(job.id)
     try {
-      const pdfjsLib = await loadPdfjs()
-      const arrayBuffer = await blob.arrayBuffer()
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-      let resumeText = ''
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i)
-        const content = await page.getTextContent()
-        resumeText += (content.items as any[]).map(item => item.str).join(' ') + '\n'
-      }
+      const resumeText = await extractPdfText(blob)
 
       const { data, error: fnErr } = await supabase.functions.invoke('match-resume', {
         body: { job_result_id: job.id, resume_text: resumeText }

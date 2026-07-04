@@ -53,22 +53,20 @@ export default function WalletPage() {
         description: `${pkg.credits} Credits`,
         prefill: { email: profile?.email },
         theme: { color: '#7c3aed' },
-        handler: async function () {
-          // Poll for the webhook to actually confirm the order as paid before
-          // claiming success — don't just assume it happened after a fixed delay.
-          let confirmed = false
-          for (let i = 0; i < 10; i++) {
-            await new Promise(r => setTimeout(r, 2000))
-            const { data: order } = await supabase.from('razorpay_orders').select('status')
-              .eq('razorpay_order_id', data.razorpay_order_id).single()
-            if (order?.status === 'paid') { confirmed = true; break }
-          }
+        handler: async function (response: any) {
+          const { data: verifyData, error: verifyErr } = await supabase.functions.invoke('verify-razorpay-payment', {
+            body: {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }
+          })
           await refreshProfile()
           await loadLedger()
-          if (confirmed) {
+          if (verifyData?.success) {
             toast.success(`${pkg.credits} credits added to your wallet!`)
           } else {
-            toast.error('Payment received, but crediting your wallet is taking longer than expected. It should appear shortly — contact support if it doesn\'t.')
+            toast.error(verifyData?.error ?? verifyErr?.message ?? 'Could not verify payment. Contact support if credits don\'t appear.')
           }
         },
       })

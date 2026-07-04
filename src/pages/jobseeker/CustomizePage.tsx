@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { Button, Card, PageHeader, Badge, PageLoading } from '../../components/ui'
 import type { JobResult, CustomizedResume, FeatureConfig } from '../../types'
+import { extractPdfText } from '../../lib/pdf'
 
 export default function CustomizePage() {
   const { jobId } = useParams<{ jobId: string }>()
@@ -42,12 +43,27 @@ export default function CustomizePage() {
     if (profile.wallet_credits < customizeCost) {
       toast.error(`Need ${customizeCost} credits. Current balance: ${profile.wallet_credits}`); return
     }
+
+    const { data: resume } = await supabase.from('resumes').select('*').eq('user_id', profile.id).eq('is_active', true).single()
+    if (!resume) { toast.error('Please upload a resume first.'); navigate('/settings/resume'); return }
+
+    const { data: blob } = await supabase.storage.from('resumes').download(resume.file_path)
+    if (!blob) { toast.error('Could not load your resume file.'); return }
+
     setCustomizing(true)
-    const { data, error: fnErr } = await supabase.functions.invoke('customize-resume', { body: { job_result_id: job.id } })
-    setCustomizing(false)
-    if (fnErr || data?.error) { toast.error(data?.error ?? 'Customization failed. Please try again.'); return }
-    await refreshProfile()
-    setExisting(data.customized as CustomizedResume)
+    try {
+      const resumeText = await extractPdfText(blob)
+      const { data, error: fnErr } = await supabase.functions.invoke('customize-resume', {
+        body: { job_result_id: job.id, resume_text: resumeText }
+      })
+      if (fnErr || data?.error) { toast.error(data?.error ?? 'Customization failed. Please try again.'); return }
+      await refreshProfile()
+      setExisting(data.customized as CustomizedResume)
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to process resume')
+    } finally {
+      setCustomizing(false)
+    }
   }
 
   function handleDownloadPDF() {
