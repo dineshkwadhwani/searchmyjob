@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { PageHeader, Card, Button, Input, Badge, StatCard, PageLoading, Modal } from '../../components/ui'
 import type { FeatureConfig, AffiliateKey, Profile, CreditLedgerEntry } from '../../types'
+import { ALWAYS_ON_FEATURES } from '../../types'
 import { formatDateTime } from '../../lib/constants'
 
 // ─────────────────────────────────────────
@@ -24,7 +25,8 @@ export function AdminFeaturesPage() {
 
   async function saveFeature(f: FeatureConfig) {
     setSaving(f.id)
-    await supabase.from('feature_config').update({ credit_cost: f.credit_cost, is_premium: f.is_premium }).eq('id', f.id)
+    const isEnabled = ALWAYS_ON_FEATURES.includes(f.feature) ? true : f.is_enabled
+    await supabase.from('feature_config').update({ credit_cost: f.credit_cost, is_premium: f.is_premium, is_enabled: isEnabled }).eq('id', f.id)
     setSaving(null); toast.success(`${f.feature} updated`)
   }
 
@@ -38,6 +40,7 @@ export function AdminFeaturesPage() {
     match: 'AI resume matching with Groq',
     customize: 'AI resume customization with Groq',
     all_platforms: 'Searching both LinkedIn + Naukri simultaneously',
+    wallet: 'Buying credits via Razorpay — turn off if the payment gateway is unavailable',
   }
 
   if (loading) return <PageLoading />
@@ -47,43 +50,60 @@ export function AdminFeaturesPage() {
       <PageHeader title="Feature Config" description="Set credit costs and premium flags for each feature" />
 
       <div className="space-y-3 max-w-2xl">
-        {features.map(f => (
-          <Card key={f.id} className="card-hover">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="font-semibold text-slate-200 capitalize">{f.feature.replace('_', ' ')}</p>
-                  {f.is_premium && <Badge label="Premium" variant="premium" />}
-                </div>
-                <p className="text-xs text-slate-600">{featureDescriptions[f.feature]}</p>
-              </div>
-
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <Coins className="w-3.5 h-3.5 text-violet-400" />
-                  <input
-                    type="number" min={0} max={1000}
-                    value={f.credit_cost}
-                    onChange={e => update(f.id, 'credit_cost', parseInt(e.target.value) || 0)}
-                    className="w-16 px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-center text-slate-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  />
-                  <span className="text-xs text-slate-600">cr</span>
+        {features.map(f => {
+          const alwaysOn = ALWAYS_ON_FEATURES.includes(f.feature)
+          const enabled = alwaysOn ? true : f.is_enabled
+          return (
+            <Card key={f.id} className="card-hover">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-semibold text-slate-200 capitalize">{f.feature.replace('_', ' ')}</p>
+                    <Badge label={enabled ? 'Enabled' : 'Disabled'} variant={enabled ? 'green' : 'red'} />
+                    {f.is_premium && <Badge label="Premium" variant="premium" />}
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    {featureDescriptions[f.feature]}
+                    {alwaysOn && ' · always on'}
+                  </p>
                 </div>
 
-                <button onClick={() => update(f.id, 'is_premium', !f.is_premium)} className="transition-colors">
-                  {f.is_premium
-                    ? <ToggleRight className="w-7 h-7 text-amber-400" />
-                    : <ToggleLeft className="w-7 h-7 text-slate-600" />
-                  }
-                </button>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-3.5 h-3.5 text-violet-400" />
+                    <input
+                      type="number" min={0} max={1000}
+                      value={f.credit_cost}
+                      onChange={e => update(f.id, 'credit_cost', parseInt(e.target.value) || 0)}
+                      className="w-16 px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-center text-slate-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                    <span className="text-xs text-slate-600">cr</span>
+                  </div>
 
-                <Button size="sm" onClick={() => saveFeature(f)} loading={saving === f.id}>
-                  <Save className="w-3.5 h-3.5" /> Save
-                </Button>
+                  <button onClick={() => !alwaysOn && update(f.id, 'is_enabled', !f.is_enabled)}
+                    disabled={alwaysOn} title={alwaysOn ? 'Basic feature — always on' : 'Toggle feature on/off'}
+                    className={`transition-colors ${alwaysOn ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                    {enabled
+                      ? <ToggleRight className="w-7 h-7 text-emerald-400" />
+                      : <ToggleLeft className="w-7 h-7 text-slate-600" />
+                    }
+                  </button>
+
+                  <button onClick={() => update(f.id, 'is_premium', !f.is_premium)} className="transition-colors">
+                    {f.is_premium
+                      ? <ToggleRight className="w-7 h-7 text-amber-400" />
+                      : <ToggleLeft className="w-7 h-7 text-slate-600" />
+                    }
+                  </button>
+
+                  <Button size="sm" onClick={() => saveFeature(f)} loading={saving === f.id}>
+                    <Save className="w-3.5 h-3.5" /> Save
+                  </Button>
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          )
+        })}
       </div>
 
       <div className="mt-6 glass-card p-4 max-w-2xl">

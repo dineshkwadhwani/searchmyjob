@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search, Zap, ExternalLink, BookmarkPlus, Brain, Wand2,
-  Clock, MapPin, Building2, Globe2, Loader2, ChevronRight, Plus
+  Clock, MapPin, Building2, Globe2, Loader2, ChevronRight, Plus, Info
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
-import { Button, Card, PageHeader, Badge, EmptyState, MatchScoreRing } from '../../components/ui'
+import { Button, Card, PageHeader, Badge, EmptyState, MatchScoreRing, Modal } from '../../components/ui'
 import type { JobResult, JobRun, SearchConfig, MatchResult, FeatureConfig } from '../../types'
 import { formatDate, formatDateTime, TIME_FRAME_OPTIONS, MAX_SEARCH_CONFIGS } from '../../lib/constants'
 import { extractPdfText } from '../../lib/pdf'
@@ -16,7 +16,7 @@ import { extractPdfText } from '../../lib/pdf'
 type JobWithMatch = JobResult & { matchResult?: MatchResult; platform?: string }
 
 export default function SearchPage() {
-  const { profile, refreshProfile } = useAuth()
+  const { profile, refreshProfile, isFeatureEnabled } = useAuth()
   const navigate = useNavigate()
   const [configs, setConfigs] = useState<SearchConfig[]>([])
   const [currentRun, setCurrentRun] = useState<JobRun | null>(null)
@@ -321,6 +321,7 @@ export default function SearchPage() {
             {filteredJobs.map(job => (
               <JobCard key={job.id} job={job}
                 matchCost={getFeatureCost('match')} customizeCost={getFeatureCost('customize')}
+                matchEnabled={isFeatureEnabled('match')} customizeEnabled={isFeatureEnabled('customize')}
                 onApply={() => handleApply(job)} onMatch={() => handleMatch(job)}
                 onCustomize={() => navigate(`/customize/${job.id}`)}
                 matchingId={matchingId} credits={profile?.wallet_credits ?? 0} hasGroq={!!profile?.groq_key_encrypted}
@@ -350,6 +351,12 @@ function SearchConfigTile({ config, isRunning, disabled, onSearch }: {
       <div className="flex items-center justify-between mb-3 gap-2">
         <h3 className="font-semibold text-slate-100 text-sm truncate">{config.name}</h3>
         {config.platform === 'all' && <Badge label="All Platforms" variant="premium" />}
+        {config.platform === 'linkedin' && (
+          <span className="text-[11px] text-blue-400 font-semibold flex items-center gap-1 flex-shrink-0"><Globe2 className="w-3.5 h-3.5" /> LinkedIn</span>
+        )}
+        {config.platform === 'naukri' && (
+          <span className="text-[11px] text-orange-400 font-semibold flex items-center gap-1 flex-shrink-0"><Building2 className="w-3.5 h-3.5" /> Naukri</span>
+        )}
       </div>
       <div className="space-y-2 text-xs flex-1">
         <div className="flex items-start gap-1.5 flex-wrap">
@@ -376,11 +383,13 @@ function SearchConfigTile({ config, isRunning, disabled, onSearch }: {
   )
 }
 
-function JobCard({ job, matchCost, customizeCost, onApply, onMatch, onCustomize, matchingId, credits, hasGroq }: {
+function JobCard({ job, matchCost, customizeCost, matchEnabled, customizeEnabled, onApply, onMatch, onCustomize, matchingId, credits, hasGroq }: {
   job: JobWithMatch; matchCost: number; customizeCost: number
+  matchEnabled: boolean; customizeEnabled: boolean
   onApply: () => void; onMatch: () => void; onCustomize: () => void
   matchingId: string | null; credits: number; hasGroq: boolean
 }) {
+  const [showJD, setShowJD] = useState(false)
   const isMatching = matchingId === job.id
   const hasMatch = !!job.matchResult
   const canMatch = credits >= matchCost && hasGroq
@@ -402,12 +411,21 @@ function JobCard({ job, matchCost, customizeCost, onApply, onMatch, onCustomize,
                   ? <span className="text-[10px] text-blue-400 font-semibold flex items-center gap-0.5"><Globe2 className="w-3 h-3" /> LinkedIn</span>
                   : <span className="text-[10px] text-orange-400 font-semibold flex items-center gap-0.5"><Building2 className="w-3 h-3" /> Naukri</span>
                 }
+                {job.description && (
+                  <button onClick={() => setShowJD(true)} title="View job description"
+                    className="text-slate-500 hover:text-violet-400 transition-colors">
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 flex-wrap">
                 <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{job.company}</span>
                 {job.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>}
                 {job.posted_at && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDate(job.posted_at)}</span>}
               </div>
+              {job.description && (
+                <p className="text-xs text-slate-500 mt-1.5 truncate">{job.description}</p>
+              )}
             </div>
             {hasMatch && <MatchScoreRing score={job.matchResult!.match_score} />}
           </div>
@@ -430,7 +448,7 @@ function JobCard({ job, matchCost, customizeCost, onApply, onMatch, onCustomize,
             <Button variant="primary" size="sm" onClick={onApply}>
               {job.is_applied ? <><ExternalLink className="w-3.5 h-3.5" /> View Job</> : <><BookmarkPlus className="w-3.5 h-3.5" /> Apply</>}
             </Button>
-            {!hasMatch && (
+            {!hasMatch && matchEnabled && (
               <Button variant="secondary" size="sm" onClick={onMatch} loading={isMatching}
                 disabled={!canMatch || isMatching}
                 title={!hasGroq ? 'Add Groq key in settings' : !canMatch ? `Need ${matchCost} credits` : ''}>
@@ -438,7 +456,7 @@ function JobCard({ job, matchCost, customizeCost, onApply, onMatch, onCustomize,
                 {matchCost > 0 && <span className="text-[10px] text-slate-500">({matchCost} cr)</span>}
               </Button>
             )}
-            {hasMatch && (
+            {hasMatch && customizeEnabled && (
               <Button variant="secondary" size="sm" onClick={onCustomize}>
                 <Wand2 className="w-3.5 h-3.5" /> Customize
                 {customizeCost > 0 && <span className="text-[10px] text-slate-500">({customizeCost} cr)</span>}
@@ -447,6 +465,15 @@ function JobCard({ job, matchCost, customizeCost, onApply, onMatch, onCustomize,
           </div>
         </div>
       </div>
+
+      {showJD && job.description && (
+        <Modal title={job.title} onClose={() => setShowJD(false)}>
+          <p className="text-xs text-slate-500 mb-3">{job.company}{job.location ? ` · ${job.location}` : ''}</p>
+          <p className="text-sm text-slate-300 leading-relaxed">
+            {job.description.slice(0, 200)}{job.description.length > 200 ? '…' : ''}
+          </p>
+        </Modal>
+      )}
     </div>
   )
 }

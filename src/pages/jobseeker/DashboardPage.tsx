@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plug, Sparkles, FileText, Search, Coins, Briefcase, Wand2, ArrowRight } from 'lucide-react'
+import { Plug, Sparkles, FileText, Search, Coins, Briefcase, Wand2, ArrowRight, Info, Rocket } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
-import { PageHeader, Badge, Button, PageLoading } from '../../components/ui'
+import { PageHeader, Badge, Button, PageLoading, Modal } from '../../components/ui'
 
 export default function DashboardPage() {
-  const { profile } = useAuth()
+  const { profile, refreshProfile, isFeatureEnabled } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [hasResume, setHasResume] = useState(false)
   const [configCount, setConfigCount] = useState(0)
   const [appliedCount, setAppliedCount] = useState(0)
   const [customizedCount, setCustomizedCount] = useState(0)
+  const [showWelcome, setShowWelcome] = useState(false)
 
   useEffect(() => { load() }, [profile])
 
@@ -30,6 +31,15 @@ export default function DashboardPage() {
     setAppliedCount(appliedRes.count ?? 0)
     setCustomizedCount(customizedRes.count ?? 0)
     setLoading(false)
+    if (!profile.has_seen_welcome) setShowWelcome(true)
+  }
+
+  async function dismissWelcome() {
+    setShowWelcome(false)
+    if (profile && !profile.has_seen_welcome) {
+      await supabase.from('profiles').update({ has_seen_welcome: true }).eq('id', profile.id)
+      await refreshProfile()
+    }
   }
 
   if (loading) return <PageLoading />
@@ -41,7 +51,50 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <PageHeader title="Dashboard" description={`Welcome back${profile?.email ? ', ' + profile.email.split('@')[0] : ''}`} />
+      <PageHeader
+        title="Dashboard"
+        description={`Welcome back${profile?.email ? ', ' + profile.email.split('@')[0] : ''}`}
+        action={
+          <button onClick={() => setShowWelcome(true)} title="About SearchMyJob AI"
+            className="w-9 h-9 rounded-xl border border-slate-700 bg-slate-800/50 flex items-center justify-center text-slate-500 hover:text-violet-400 hover:border-violet-500/50 transition-all">
+            <Info className="w-4 h-4" />
+          </button>
+        }
+      />
+
+      {showWelcome && (
+        <Modal title="Welcome to SearchMyJob AI" onClose={dismissWelcome}>
+          <div className="space-y-4 text-sm text-slate-400 leading-relaxed">
+            <p>
+              A tool built to make your job search journey easy. With SearchMyJob AI, you can:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-slate-300">
+              <li>Search jobs</li>
+              <li>Check your match score</li>
+              <li>Customize your resume for the job</li>
+              <li>Apply and track your applications</li>
+            </ol>
+            <p>
+              Instead of searching for jobs yourself, let our agents work for you across multiple
+              platforms. You can set up to <strong className="text-slate-200">3 search configs</strong>,
+              each with up to <strong className="text-slate-200">3 roles, 3 skills, and 3 locations</strong>.
+              We'll find jobs matching your criteria and show you how well your profile matches each
+              one. When you're ready to apply, we'll customize your resume to closely match the job
+              description — boosting your chances of landing an interview.
+            </p>
+            <p>
+              This tool is built to help, so it's free to use. It runs on a{' '}
+              <strong className="text-slate-200">Bring Your Own Key (BYOK)</strong> model — you connect
+              your own free API keys, and SearchMyJob AI works relentlessly to help you succeed. If you
+              run out of your free allowance, you'll need to wait for your next top-up or recharge your
+              API account.
+            </p>
+            <Button onClick={dismissWelcome} size="lg" className="w-full mt-2">
+              <Rocket className="w-4 h-4" /> Start My Job Search Journey
+            </Button>
+          </div>
+        </Modal>
+      )}
 
       <DashboardSection title="Connectors">
         <StatusTile
@@ -87,7 +140,7 @@ export default function DashboardPage() {
           value={credits}
           label="Available Credits"
           badge={credits === 0 ? { label: 'Empty', variant: 'yellow' } : { label: 'Active', variant: 'green' }}
-          actionLabel="Add Credits"
+          actionLabel={isFeatureEnabled('wallet') ? 'Add Credits' : undefined}
           onAction={() => navigate('/wallet')}
         />
         <ActivityTile
@@ -101,7 +154,7 @@ export default function DashboardPage() {
           icon={<Wand2 className="w-5 h-5" />}
           value={customizedCount}
           label="Customized Resumes"
-          actionLabel="View"
+          actionLabel={isFeatureEnabled('customize') ? 'View' : undefined}
           onAction={() => navigate('/customized-resumes')}
         />
       </DashboardSection>
@@ -148,7 +201,7 @@ function StatusTile({ icon, title, description, isReady, actionLabel, onAction }
 function ActivityTile({ icon, value, label, badge, actionLabel, onAction }: {
   icon: ReactNode; value: number; label: string
   badge?: { label: string; variant: 'green' | 'yellow' }
-  actionLabel: string; onAction: () => void
+  actionLabel?: string; onAction: () => void
 }) {
   return (
     <div className="glass-card p-5 flex flex-col">
@@ -160,9 +213,11 @@ function ActivityTile({ icon, value, label, badge, actionLabel, onAction }: {
       </div>
       <p className="text-2xl font-bold text-slate-100">{value}</p>
       <p className="text-xs text-slate-500 mb-4">{label}</p>
-      <Button size="sm" variant="secondary" onClick={onAction} className="w-full mt-auto">
-        {actionLabel} <ArrowRight className="w-3.5 h-3.5" />
-      </Button>
+      {actionLabel && (
+        <Button size="sm" variant="secondary" onClick={onAction} className="w-full mt-auto">
+          {actionLabel} <ArrowRight className="w-3.5 h-3.5" />
+        </Button>
+      )}
     </div>
   )
 }

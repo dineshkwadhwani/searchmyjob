@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import type { Profile } from '../types'
+import type { Profile, FeatureConfig, FeatureName } from '../types'
 
 interface AuthContextValue {
   user: User | null
@@ -10,10 +10,13 @@ interface AuthContextValue {
   profile: Profile | null
   loading: boolean
   profileError: string | null
+  features: FeatureConfig[]
+  isFeatureEnabled: (name: FeatureName) => boolean
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  refreshFeatures: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -23,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [profileError, setProfileError] = useState<string | null>(null)
+  const [features, setFeatures] = useState<FeatureConfig[]>([])
   const [loading, setLoading] = useState(true)
 
   async function fetchProfile(userId: string) {
@@ -44,18 +48,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await fetchProfile(user.id)
   }
 
+  async function refreshFeatures() {
+    const { data } = await supabase.from('feature_config').select('*')
+    if (data) setFeatures(data as FeatureConfig[])
+  }
+
+  function isFeatureEnabled(name: FeatureName): boolean {
+    const f = features.find(f => f.feature === name)
+    return f ? f.is_enabled : true
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id).finally(() => setLoading(false))
-      else setLoading(false)
+      if (session?.user) {
+        Promise.all([fetchProfile(session.user.id), refreshFeatures()]).finally(() => setLoading(false))
+      } else {
+        setLoading(false)
+      }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id)
+      if (session?.user) { fetchProfile(session.user.id); refreshFeatures() }
       else setProfile(null)
     })
 
@@ -78,7 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, profileError, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{
+      user, session, profile, loading, profileError, features, isFeatureEnabled,
+      signIn, signUp, signOut, refreshProfile, refreshFeatures,
+    }}>
       {children}
     </AuthContext.Provider>
   )

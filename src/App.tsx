@@ -22,7 +22,7 @@ import { AdminFeaturesPage, AdminAffiliateKeysPage, AdminUsersPage } from './pag
 const queryClient = new QueryClient()
 
 function AppRoutes() {
-  const { user, profile, loading, profileError } = useAuth()
+  const { user, profile, loading, profileError, isFeatureEnabled } = useAuth()
   const location = useLocation()
 
   if (location.pathname === '/privacy-policy') return <PrivacyPolicyPage />
@@ -107,9 +107,9 @@ function AppRoutes() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/job-bucket" element={<JobBucketPage />} />
-            <Route path="/wallet" element={<WalletPage />} />
-            <Route path="/customized-resumes" element={<CustomizedResumesPage />} />
-            <Route path="/customize/:jobId" element={<CustomizePage />} />
+            <Route path="/wallet" element={isFeatureEnabled('wallet') ? <WalletPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/customized-resumes" element={isFeatureEnabled('customize') ? <CustomizedResumesPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/customize/:jobId" element={isFeatureEnabled('customize') ? <CustomizePage /> : <Navigate to="/dashboard" replace />} />
             <Route path="/settings/resume" element={<ResumeSettings />} />
             <Route path="/settings/search" element={<SearchSettings />} />
             <Route path="/settings/apify" element={<ApifySettings />} />

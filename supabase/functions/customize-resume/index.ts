@@ -26,6 +26,9 @@ serve(async (req) => {
 
     const { data: features } = await supabase.from('feature_config').select('*')
     const customizeFeature = features?.find((f: any) => f.feature === 'customize')
+    if (customizeFeature && !customizeFeature.is_enabled) {
+      return Response.json({ error: 'Resume customization is currently disabled' }, { headers: corsHeaders })
+    }
     const cost = customizeFeature?.credit_cost ?? 10
 
     if (profile.wallet_credits < cost) {

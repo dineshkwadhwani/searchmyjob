@@ -2,7 +2,8 @@ export type UserRole = 'superadmin' | 'jobseeker'
 export type RunStatus = 'pending' | 'running' | 'completed' | 'failed'
 export type SearchPlatform = 'linkedin' | 'naukri' | 'all'
 export type TimeFrame = 'r86400' | 'r172800' | 'r604800' | 'r1296000'
-export type FeatureName = 'search' | 'apply' | 'match' | 'customize' | 'all_platforms'
+export type FeatureName = 'search' | 'apply' | 'match' | 'customize' | 'all_platforms' | 'wallet'
+export const ALWAYS_ON_FEATURES: FeatureName[] = ['search', 'apply']
 export type CreditTxType = 'topup' | 'search' | 'apply' | 'match' | 'customize' | 'refund' | 'admin_grant' | 'signup_bonus'
 
 export interface Profile {
@@ -13,6 +14,7 @@ export interface Profile {
   wallet_credits: number
   apify_key_encrypted?: string
   groq_key_encrypted?: string
+  has_seen_welcome: boolean
   created_at: string
   updated_at: string
 }
@@ -55,6 +57,7 @@ export interface JobResult {
   location?: string
   link?: string
   job_id?: string
+  description?: string
   posted_at?: string
   search_location?: string
   search_keywords?: string
@@ -115,6 +118,7 @@ export interface FeatureConfig {
   feature: FeatureName
   credit_cost: number
   is_premium: boolean
+  is_enabled: boolean
   updated_at: string
   updated_by?: string
 }

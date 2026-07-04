@@ -45,6 +45,10 @@ serve(async (req) => {
     const allPlatformFeature = features?.find((f: any) => f.feature === 'all_platforms')
     const searchFeature = features?.find((f: any) => f.feature === 'search')
 
+    if (config.platform === 'all' && allPlatformFeature && !allPlatformFeature.is_enabled) {
+      return Response.json({ error: 'Searching all platforms at once is currently disabled' }, { headers: corsHeaders })
+    }
+
     let totalCost = searchFeature?.credit_cost ?? 0
     if (config.platform === 'all') {
       totalCost += allPlatformFeature?.credit_cost ?? 0

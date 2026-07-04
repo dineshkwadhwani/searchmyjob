@@ -148,6 +148,9 @@ export function SearchSettings() {
     return features.find(f => f.feature === name)?.credit_cost ?? 0
   }
 
+  const allPlatformsEnabled = features.find(f => f.feature === 'all_platforms')?.is_enabled !== false
+  const visiblePlatformOptions = PLATFORM_OPTIONS.filter(p => p.value !== 'all' || allPlatformsEnabled)
+
   function updateActive(patch: Partial<SearchConfig>) {
     setConfigs(prev => prev.map((c, i) => i === activeIndex ? { ...c, ...patch } : c))
   }
@@ -264,8 +267,8 @@ export function SearchSettings() {
               options={TIME_FRAME_OPTIONS} />
             <div className="space-y-1.5">
               <label className="label">Platform</label>
-              <div className="grid grid-cols-3 gap-2">
-                {PLATFORM_OPTIONS.map(p => (
+              <div className={`grid gap-2 ${visiblePlatformOptions.length >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {visiblePlatformOptions.map(p => (
                   <button key={p.value} type="button"
                     onClick={() => updateActive({ platform: p.value as any })}
                     className={`relative px-3 py-3 rounded-xl border text-sm font-medium transition-all text-center ${
@@ -343,15 +346,34 @@ export function ApifySettings() {
     <div>
       <PageHeader title="Apify Settings" description="Connect your Apify account to enable job scraping" />
       <div className="max-w-xl space-y-6">
-        {affiliate?.referral_url && (
-          <Card className="bg-violet-500/5 border-violet-500/20">
-            <p className="text-sm font-semibold text-violet-300 mb-2">Don't have an Apify account?</p>
-            <p className="text-xs text-slate-500 mb-3">{affiliate.instructions}</p>
-            <a href={affiliate.referral_url} target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary" size="sm"><ExternalLink className="w-3.5 h-3.5" /> Sign up on Apify</Button>
+        <Card className="bg-violet-500/5 border-violet-500/20">
+          <p className="text-sm font-semibold text-violet-300 mb-2">Why do I need this?</p>
+          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+            You'll need to connect an Apify account to fetch jobs matching your search criteria.
+            Apify gives you a free $5.00 credit when you sign up, which is good for about 50 searches.
+            Follow these steps to activate your connector:
+          </p>
+          <ol className="text-xs text-slate-400 space-y-2.5 list-decimal list-inside leading-relaxed">
+            <li>
+              Go to{' '}
+              <a href={affiliate?.referral_url || 'https://apify.com'} target="_blank" rel="noopener noreferrer"
+                className="text-violet-400 hover:underline">
+                apify.com <ExternalLink className="inline w-3 h-3" />
+              </a>
+            </li>
+            <li>Click <strong className="text-slate-300">"Get Started"</strong> in the top right. On mobile, tap the three lines in the top left instead.</li>
+            <li>Click <strong className="text-slate-300">"Continue with Google"</strong>, or sign up with your email.</li>
+            <li>Once you're in, choose a username of your liking.</li>
+            <li>Click <strong className="text-slate-300">"Integrations"</strong> in the left panel, then click the <strong className="text-slate-300">API</strong> button in the top right of the screen.</li>
+            <li>Click <strong className="text-slate-300">"Manage Tokens"</strong>, then click <strong className="text-slate-300">"Create a new Token"</strong> and give it a description.</li>
+            <li>Copy the newly created token and paste it below.</li>
+          </ol>
+          {affiliate?.referral_url && (
+            <a href={affiliate.referral_url} target="_blank" rel="noopener noreferrer" className="block mt-4">
+              <Button variant="secondary" size="sm" className="w-full"><ExternalLink className="w-3.5 h-3.5" /> Sign up on Apify</Button>
             </a>
-          </Card>
-        )}
+          )}
+        </Card>
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-slate-300">API Key</h3>
@@ -371,14 +393,6 @@ export function ApifySettings() {
               <Save className="w-4 h-4" /> {hasKey ? 'Update Key' : 'Save Key'}
             </Button>
           </div>
-        </Card>
-        <Card>
-          <p className="text-xs text-slate-500">
-            Get your key from{' '}
-            <a href="https://apify.com/account/integrations" target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:underline">
-              Apify → Account → Integrations <ExternalLink className="inline w-3 h-3" />
-            </a>
-          </p>
         </Card>
       </div>
     </div>
@@ -418,26 +432,32 @@ export function GroqSettings() {
       <PageHeader title="Groq Settings" description="Connect Groq AI for resume matching and customization" />
       <div className="max-w-xl space-y-6">
         <Card className="bg-amber-500/5 border-amber-500/20">
-          <div className="flex gap-3">
-            <span className="text-2xl">⚡</span>
-            <div>
-              <p className="text-sm font-semibold text-amber-300 mb-1">Why Groq?</p>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Groq runs Llama 3.3 70B at blazing speed — your resume gets matched and customized in seconds.
-                Your key is stored securely and only used for your requests.
-              </p>
-            </div>
-          </div>
-        </Card>
-        {affiliate?.referral_url && (
-          <Card className="bg-violet-500/5 border-violet-500/20">
-            <p className="text-sm font-semibold text-violet-300 mb-2">Get a free Groq API key</p>
-            <p className="text-xs text-slate-500 mb-3">{affiliate.instructions}</p>
-            <a href={affiliate.referral_url} target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary" size="sm"><ExternalLink className="w-3.5 h-3.5" /> Sign up on Groq</Button>
+          <p className="text-sm font-semibold text-amber-300 mb-2">Why do I need this?</p>
+          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+            You'll need to connect a Groq AI account to match your profile against jobs. Groq is free
+            and gives you enough credits to match and score your profile against jobs of your choice.
+            Follow these steps to activate your connector:
+          </p>
+          <ol className="text-xs text-slate-400 space-y-2.5 list-decimal list-inside leading-relaxed">
+            <li>
+              Go to{' '}
+              <a href={affiliate?.referral_url || 'https://groq.com'} target="_blank" rel="noopener noreferrer"
+                className="text-violet-400 hover:underline">
+                groq.com <ExternalLink className="inline w-3 h-3" />
+              </a>
+            </li>
+            <li>Click <strong className="text-slate-300">"Start Building"</strong> in the top right, or the three lines on mobile.</li>
+            <li>Click <strong className="text-slate-300">"Continue with Google"</strong>, or pick an option of your choice to register.</li>
+            <li>Once you're logged in, click <strong className="text-slate-300">"API Keys"</strong>.</li>
+            <li>Click <strong className="text-slate-300">"Create API Key"</strong>. Give it a name and set it to no expiration.</li>
+            <li>Copy the key and paste it below.</li>
+          </ol>
+          {affiliate?.referral_url && (
+            <a href={affiliate.referral_url} target="_blank" rel="noopener noreferrer" className="block mt-4">
+              <Button variant="secondary" size="sm" className="w-full"><ExternalLink className="w-3.5 h-3.5" /> Sign up on Groq</Button>
             </a>
-          </Card>
-        )}
+          )}
+        </Card>
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-slate-300">API Key</h3>

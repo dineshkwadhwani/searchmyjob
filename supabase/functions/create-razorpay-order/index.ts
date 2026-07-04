@@ -25,6 +25,11 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
     if (!user) return Response.json({ error: 'Unauthorized' }, { headers: corsHeaders })
 
+    const { data: walletFeature } = await supabase.from('feature_config').select('is_enabled').eq('feature', 'wallet').single()
+    if (walletFeature && !walletFeature.is_enabled) {
+      return Response.json({ error: 'Credit top-ups are temporarily unavailable. Please try again later.' }, { headers: corsHeaders })
+    }
+
     const { package: packageId } = await req.json()
     const pkg = CREDIT_PACKAGES[packageId]
     if (!pkg) return Response.json({ error: 'Unknown credit package' }, { headers: corsHeaders })

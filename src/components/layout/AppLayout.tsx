@@ -7,6 +7,7 @@ import {
   Sparkles, ChevronRight, Coins, LayoutDashboard,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import type { FeatureName } from '../../types'
 
 const adminNav = [
   { to: '/admin/features',       label: 'Feature Config',  icon: <Sliders className="w-4 h-4" /> },
@@ -14,12 +15,12 @@ const adminNav = [
   { to: '/admin/users',          label: 'Manage Users',    icon: <Users className="w-4 h-4" /> },
 ]
 
-const jobseekerNav = [
-  { to: '/dashboard',   label: 'Dashboard',        icon: <LayoutDashboard className="w-4 h-4" />, isPremium: false },
-  { to: '/search',      label: 'Search Jobs',      icon: <Search className="w-4 h-4" />,   isPremium: false },
-  { to: '/job-bucket',  label: 'Job Bucket',        icon: <Briefcase className="w-4 h-4" />,isPremium: false },
-  { to: '/wallet',      label: 'Wallet',            icon: <Wallet className="w-4 h-4" />,   isPremium: false },
-  { to: '/customized-resumes', label: 'AI Resumes', icon: <FileText className="w-4 h-4" />, isPremium: true },
+const jobseekerNav: { to: string; label: string; icon: ReactNode; isPremium?: boolean; feature?: FeatureName }[] = [
+  { to: '/dashboard',   label: 'Dashboard',        icon: <LayoutDashboard className="w-4 h-4" /> },
+  { to: '/search',      label: 'Search Jobs',      icon: <Search className="w-4 h-4" />,   feature: 'search' },
+  { to: '/job-bucket',  label: 'Job Bucket',        icon: <Briefcase className="w-4 h-4" />, feature: 'apply' },
+  { to: '/wallet',      label: 'Wallet',            icon: <Wallet className="w-4 h-4" />,   feature: 'wallet' },
+  { to: '/customized-resumes', label: 'AI Resumes', icon: <FileText className="w-4 h-4" />, isPremium: true, feature: 'customize' },
 ]
 
 const settingsNav = [
@@ -32,26 +33,28 @@ const settingsNav = [
 function NavItem({ to, label, icon, isPremium }: { to: string; label: string; icon: ReactNode; isPremium?: boolean }) {
   return (
     <NavLink to={to} className={({ isActive }) =>
-      `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+      `group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium leading-none transition-all duration-150 ${
         isActive
-          ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30 shadow-lg shadow-violet-500/10'
+          ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30'
           : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
       }`}>
       <span className="flex-shrink-0">{icon}</span>
       <span className="flex-1">{label}</span>
       {isPremium && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold">PRO</span>
+        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold leading-none">PRO</span>
       )}
     </NavLink>
   )
 }
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, isFeatureEnabled } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
 
   const isAdmin = profile?.role === 'superadmin'
+  const visibleJobseekerNav = jobseekerNav.filter(n => !n.feature || isFeatureEnabled(n.feature))
+  const walletEnabled = isFeatureEnabled('wallet')
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-700/50">
@@ -69,10 +72,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Credits pill (jobseeker) */}
-      {!isAdmin && (
-        <div className="px-4 pt-4">
+      {!isAdmin && walletEnabled && (
+        <div className="px-3 pt-3">
           <button onClick={() => navigate('/wallet')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-violet-600/10 to-indigo-600/10 border border-violet-500/20 hover:border-violet-500/40 transition-all group">
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600/10 to-indigo-600/10 border border-violet-500/20 hover:border-violet-500/40 transition-all group">
             <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
               <Coins className="w-4 h-4 text-violet-400" />
             </div>
@@ -86,26 +89,28 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       )}
 
       {/* Nav */}
-      <div className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+      <div className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {isAdmin
           ? adminNav.map(n => <NavItem key={n.to} {...n} />)
-          : jobseekerNav.map(n => <NavItem key={n.to} {...n} />)
+          : visibleJobseekerNav.map(n => <NavItem key={n.to} {...n} />)
         }
 
         {!isAdmin && (
           <>
-            <div className="pt-4 pb-1 px-1">
+            <div className="pt-3 pb-1 px-3">
               <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Settings</p>
             </div>
-            {settingsNav.map(s => (
-              <NavLink key={s.to} to={s.to} className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
-                  isActive ? 'text-violet-400 bg-violet-500/10' : 'text-slate-600 hover:text-slate-400 hover:bg-slate-800/40'
-                }`}>
-                <div className={`w-1.5 h-1.5 rounded-full ${location.pathname === s.to ? 'bg-violet-400' : 'bg-slate-700'}`} />
-                {s.label}
-              </NavLink>
-            ))}
+            <div className="space-y-0.5">
+              {settingsNav.map(s => (
+                <NavLink key={s.to} to={s.to} className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs leading-none transition-all ${
+                    isActive ? 'text-violet-400 bg-violet-500/10' : 'text-slate-600 hover:text-slate-400 hover:bg-slate-800/40'
+                  }`}>
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${location.pathname === s.to ? 'bg-violet-400' : 'bg-slate-700'}`} />
+                  {s.label}
+                </NavLink>
+              ))}
+            </div>
           </>
         )}
       </div>

@@ -26,6 +26,9 @@ serve(async (req) => {
 
     const { data: features } = await supabase.from('feature_config').select('*')
     const matchFeature = features?.find((f: any) => f.feature === 'match')
+    if (matchFeature && !matchFeature.is_enabled) {
+      return Response.json({ error: 'Resume matching is currently disabled' }, { headers: corsHeaders })
+    }
     const cost = matchFeature?.credit_cost ?? 5
 
     if (profile.wallet_credits < cost) {

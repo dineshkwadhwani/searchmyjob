@@ -1,6 +1,13 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Strip any HTML markup so stored/displayed descriptions are always plain text,
+// regardless of whether the actor returns HTML or plain text for this field.
+function stripHtml(input: unknown): string {
+  if (!input) return ''
+  return String(input).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 serve(async (req) => {
   const url = new URL(req.url)
   const runId = url.searchParams.get('run_id')
@@ -43,6 +50,12 @@ serve(async (req) => {
       return new Response('ok', { status: 200 })
     }
 
+    // Log available fields once per run so we can confirm the actor's actual
+    // description field name from function logs if the guesses below are wrong.
+    if (items.length > 0) {
+      console.log('Sample dataset item keys:', Object.keys(items[0]))
+    }
+
     // Insert job results
     const toInsert = items
       .filter((item: any) => item.title && item.company)
@@ -58,6 +71,10 @@ serve(async (req) => {
         posted_at: item.postedAt ? new Date(item.postedAt).toISOString() : null,
         search_location: item.searchLocation ?? '',
         search_keywords: item.searchKeywords ?? '',
+        description: stripHtml(
+          item.description ?? item.jobDescription ?? item.descriptionHtml ??
+          item.descriptionText ?? item.job_description ?? ''
+        ).slice(0, 1000),
       }))
 
     if (toInsert.length > 0) {
