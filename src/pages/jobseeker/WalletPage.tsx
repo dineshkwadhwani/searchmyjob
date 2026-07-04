@@ -31,7 +31,7 @@ export default function WalletPage() {
     setPayLoading(index)
     try {
       const { data, error: fnErr } = await supabase.functions.invoke('create-razorpay-order', {
-        body: { amount_paise: pkg.amount_paise, credits: pkg.credits }
+        body: { package: pkg.id }
       })
       if (fnErr || data?.error) throw new Error(data?.error ?? fnErr?.message)
 
@@ -47,17 +47,29 @@ export default function WalletPage() {
       const rzp = new window.Razorpay({
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         order_id: data.razorpay_order_id,
-        amount: pkg.amount_paise,
+        amount: data.amount_paise,
         currency: 'INR',
         name: 'SearchMyJob AI',
         description: `${pkg.credits} Credits`,
         prefill: { email: profile?.email },
         theme: { color: '#7c3aed' },
         handler: async function () {
-          await new Promise(r => setTimeout(r, 1500)) // Give webhook time to fire
+          // Poll for the webhook to actually confirm the order as paid before
+          // claiming success — don't just assume it happened after a fixed delay.
+          let confirmed = false
+          for (let i = 0; i < 10; i++) {
+            await new Promise(r => setTimeout(r, 2000))
+            const { data: order } = await supabase.from('razorpay_orders').select('status')
+              .eq('razorpay_order_id', data.razorpay_order_id).single()
+            if (order?.status === 'paid') { confirmed = true; break }
+          }
           await refreshProfile()
           await loadLedger()
-          toast.success(`${pkg.credits} credits added to your wallet!`)
+          if (confirmed) {
+            toast.success(`${pkg.credits} credits added to your wallet!`)
+          } else {
+            toast.error('Payment received, but crediting your wallet is taking longer than expected. It should appear shortly — contact support if it doesn\'t.')
+          }
         },
       })
       rzp.open()
@@ -107,17 +119,17 @@ export default function WalletPage() {
               {i === 2 && (
                 <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] px-2.5 py-0.5 bg-violet-600 text-white rounded-full font-bold whitespace-nowrap">⚡ Popular</span>
               )}
+              <p className="text-xs font-semibold text-violet-400 mb-2">{pkg.name}</p>
               <p className="text-2xl font-bold text-slate-100 mb-0.5">{pkg.credits}</p>
               <p className="text-xs text-slate-500 mb-4">Credits</p>
               <div className="flex items-baseline gap-1">
                 <p className="text-lg font-bold text-violet-400">₹{pkg.amount_paise / 100}</p>
                 <p className="text-xs text-slate-600">INR</p>
               </div>
-              {pkg.credits > 100 && (
-                <p className="text-[10px] text-emerald-400 mt-1">
-                  ₹{(pkg.amount_paise / pkg.credits / 100).toFixed(2)}/credit
-                </p>
-              )}
+              <p className="text-[10px] text-emerald-400 mt-1">
+                ₹{(pkg.amount_paise / pkg.credits / 100).toFixed(2)}/credit
+                {pkg.discountPct > 0 && <span className="text-amber-400"> · {pkg.discountPct}% off</span>}
+              </p>
               {payLoading === i && (
                 <div className="absolute inset-0 bg-slate-900/80 rounded-2xl flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />

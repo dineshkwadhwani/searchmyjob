@@ -6,6 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Source of truth for pricing — must mirror CREDIT_PACKAGES in src/lib/constants.ts.
+// Never trust amount/credits supplied by the client; look them up here instead.
+const CREDIT_PACKAGES: Record<string, { credits: number; amountPaise: number }> = {
+  explorer:  { credits: 10,  amountPaise: 10000 },
+  seeker:    { credits: 25,  amountPaise: 23750 },
+  contender: { credits: 50,  amountPaise: 45000 },
+  achiever:  { credits: 100, amountPaise: 85000 },
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -16,8 +25,9 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
     if (!user) return Response.json({ error: 'Unauthorized' }, { headers: corsHeaders })
 
-    const { amount_paise, credits } = await req.json()
-    if (!amount_paise || !credits) return Response.json({ error: 'amount_paise and credits required' }, { headers: corsHeaders })
+    const { package: packageId } = await req.json()
+    const pkg = CREDIT_PACKAGES[packageId]
+    if (!pkg) return Response.json({ error: 'Unknown credit package' }, { headers: corsHeaders })
 
     const keyId = Deno.env.get('RAZORPAY_KEY_ID')!
     const keySecret = Deno.env.get('RAZORPAY_KEY_SECRET')!
@@ -26,7 +36,7 @@ serve(async (req) => {
     const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: amount_paise, currency: 'INR', receipt: `credits_${user.id}_${Date.now()}` })
+      body: JSON.stringify({ amount: pkg.amountPaise, currency: 'INR', receipt: `c_${Date.now()}_${user.id.slice(0, 8)}` })
     })
 
     const order = await orderRes.json()
@@ -36,12 +46,12 @@ serve(async (req) => {
     await supabase.from('razorpay_orders').insert({
       user_id: user.id,
       razorpay_order_id: order.id,
-      amount_paise,
-      credits_to_add: credits,
+      amount_paise: pkg.amountPaise,
+      credits_to_add: pkg.credits,
       status: 'created',
     })
 
-    return Response.json({ razorpay_order_id: order.id }, { headers: corsHeaders })
+    return Response.json({ razorpay_order_id: order.id, amount_paise: pkg.amountPaise }, { headers: corsHeaders })
 
   } catch (err: any) {
     console.error('create-razorpay-order error:', err)

@@ -29,11 +29,15 @@ export const MAX_LOCATIONS = 3
 export const MAX_SKILLS    = 3
 export const MAX_RESUME_SIZE_BYTES = 1024 * 1024 // 1MB
 
+// Base rate: ₹10 per credit, before any pack discount.
+// `id` must match the package keys defined server-side in the
+// create-razorpay-order function — the server is the source of truth
+// for pricing; these values are for display only.
 export const CREDIT_PACKAGES = [
-  { credits: 50,  amount_paise: 4900,  label: '50 Credits — ₹49' },
-  { credits: 100, amount_paise: 9900,  label: '100 Credits — ₹99' },
-  { credits: 250, amount_paise: 19900, label: '250 Credits — ₹199' },
-  { credits: 500, amount_paise: 34900, label: '500 Credits — ₹349' },
+  { id: 'explorer',  name: 'Explorer Pack',  credits: 10,  amount_paise: 10000, discountPct: 0 },
+  { id: 'seeker',    name: 'Seeker Pack',    credits: 25,  amount_paise: 23750, discountPct: 5 },
+  { id: 'contender', name: 'Contender Pack', credits: 50,  amount_paise: 45000, discountPct: 10 },
+  { id: 'achiever',  name: 'Achiever Pack',  credits: 100, amount_paise: 85000, discountPct: 15 },
 ]
 
 export function formatCredits(n: number) {

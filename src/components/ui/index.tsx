@@ -1,5 +1,5 @@
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
-import { Loader2, Sparkles, TrendingUp } from 'lucide-react'
+import { Loader2, Sparkles, TrendingUp, X } from 'lucide-react'
 
 // ── Button ──
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -270,6 +270,24 @@ export function Alert({ type, message }: { type: 'success' | 'error' | 'warning'
   return (
     <div className={`px-4 py-3 rounded-xl border text-sm font-medium ${styles[type]}`}>
       {message}
+    </div>
+  )
+}
+
+// ── Modal ──
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative glass-card w-full max-w-lg max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 flex-shrink-0">
+          <h3 className="font-semibold text-slate-100">{title}</h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-6">{children}</div>
+      </div>
     </div>
   )
 }

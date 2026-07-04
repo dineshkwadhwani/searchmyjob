@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Save, Key, ExternalLink, Users, ToggleLeft, ToggleRight, Coins, Shield, CheckCircle } from 'lucide-react'
+import { Save, Key, ExternalLink, Users, ToggleLeft, ToggleRight, Coins, Shield, CheckCircle, Wallet, TrendingUp, TrendingDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
-import { PageHeader, Card, Button, Input, Badge, StatCard, PageLoading } from '../../components/ui'
-import type { FeatureConfig, AffiliateKey, Profile } from '../../types'
+import { PageHeader, Card, Button, Input, Badge, StatCard, PageLoading, Modal } from '../../components/ui'
+import type { FeatureConfig, AffiliateKey, Profile, CreditLedgerEntry } from '../../types'
+import { formatDateTime } from '../../lib/constants'
 
 // ─────────────────────────────────────────
 // FEATURE CONFIG
@@ -197,8 +198,21 @@ export function AdminUsersPage() {
   const [toggling, setToggling] = useState<string | null>(null)
   const [grantingId, setGrantingId] = useState<string | null>(null)
   const [grantAmount, setGrantAmount] = useState<Record<string, number>>({})
+  const [walletUser, setWalletUser] = useState<Profile | null>(null)
+  const [ledger, setLedger] = useState<CreditLedgerEntry[]>([])
+  const [ledgerLoading, setLedgerLoading] = useState(false)
 
   useEffect(() => { load() }, [])
+
+  async function openWallet(user: Profile) {
+    setWalletUser(user)
+    setLedgerLoading(true)
+    const { data, error } = await supabase.from('credit_ledger').select('*')
+      .eq('user_id', user.id).order('created_at', { ascending: false }).limit(50)
+    if (error) toast.error(error.message)
+    setLedger((data ?? []) as CreditLedgerEntry[])
+    setLedgerLoading(false)
+  }
 
   async function load() {
     const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
@@ -304,15 +318,20 @@ export function AdminUsersPage() {
                   )}
                 </td>
                 <td className="px-5 py-4 text-right">
-                  {user.role !== 'superadmin' && (
-                    <button onClick={() => toggleUser(user)} disabled={toggling === user.id}
-                      className="transition-colors disabled:opacity-50">
-                      {user.is_enabled
-                        ? <ToggleRight className="w-8 h-8 text-emerald-400 hover:text-emerald-300" />
-                        : <ToggleLeft className="w-8 h-8 text-slate-600 hover:text-slate-400" />
-                      }
-                    </button>
-                  )}
+                  <div className="flex items-center justify-end gap-3">
+                    <Button size="sm" variant="ghost" onClick={() => openWallet(user)}>
+                      <Wallet className="w-3.5 h-3.5" /> Wallet
+                    </Button>
+                    {user.role !== 'superadmin' && (
+                      <button onClick={() => toggleUser(user)} disabled={toggling === user.id}
+                        className="transition-colors disabled:opacity-50">
+                        {user.is_enabled
+                          ? <ToggleRight className="w-8 h-8 text-emerald-400 hover:text-emerald-300" />
+                          : <ToggleLeft className="w-8 h-8 text-slate-600 hover:text-slate-400" />
+                        }
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -322,6 +341,49 @@ export function AdminUsersPage() {
           <div className="py-12 text-center text-slate-600 text-sm">No users found</div>
         )}
       </div>
+
+      {walletUser && (
+        <Modal title={`${walletUser.email} — Wallet`} onClose={() => setWalletUser(null)}>
+          <div className="flex items-center gap-3 mb-5 p-4 rounded-xl bg-violet-500/5 border border-violet-500/20">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center flex-shrink-0">
+              <Coins className="w-5 h-5 text-violet-400" />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-slate-100">{walletUser.wallet_credits}</p>
+              <p className="text-xs text-slate-500">Current balance</p>
+            </div>
+          </div>
+
+          {ledgerLoading ? (
+            <PageLoading />
+          ) : ledger.length === 0 ? (
+            <p className="text-sm text-slate-600 text-center py-8">No transactions yet.</p>
+          ) : (
+            <div className="space-y-1">
+              {ledger.map(entry => (
+                <div key={entry.id} className="flex items-center gap-3 py-3 border-b border-slate-800/60 last:border-0">
+                  <div className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center flex-shrink-0">
+                    {['topup', 'admin_grant', 'refund'].includes(entry.type)
+                      ? <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                      : <TrendingDown className="w-3.5 h-3.5 text-red-400" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Badge label={entry.type.replace('_', ' ')} variant="gray" />
+                    {entry.note && <p className="text-xs text-slate-600 truncate mt-0.5">{entry.note}</p>}
+                    <p className="text-[10px] text-slate-600 mt-0.5">{formatDateTime(entry.created_at)}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`text-sm font-bold ${entry.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {entry.amount > 0 ? '+' : ''}{entry.amount}
+                    </p>
+                    <p className="text-[10px] text-slate-600">bal: {entry.balance_after}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   )
 }

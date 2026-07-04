@@ -4,6 +4,7 @@ import { Sparkles, Mail, Lock, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
 import { Button, Input } from '../../components/ui'
+import Footer from '../../components/layout/Footer'
 
 export default function LoginPage() {
   const { signIn } = useAuth()
@@ -22,7 +23,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex overflow-hidden">
+    <div className="min-h-screen bg-slate-950 flex flex-col">
+      <div className="flex flex-1 overflow-hidden">
       {/* Left decorative panel */}
       <div className="hidden lg:flex w-1/2 relative bg-gradient-to-br from-violet-950 via-slate-900 to-slate-950 flex-col items-center justify-center p-12 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-violet-600/20 rounded-full blur-3xl animate-pulse-slow" />
@@ -85,6 +87,8 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+      </div>
+      <Footer />
     </div>
   )
 }

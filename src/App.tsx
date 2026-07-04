@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -8,6 +8,8 @@ import { Spinner } from './components/ui'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage'
+import TermsOfServicePage from './pages/legal/TermsOfServicePage'
 import SearchPage from './pages/jobseeker/SearchPage'
 import JobBucketPage from './pages/jobseeker/JobBucketPage'
 import WalletPage from './pages/jobseeker/WalletPage'
@@ -20,6 +22,10 @@ const queryClient = new QueryClient()
 
 function AppRoutes() {
   const { user, profile, loading, profileError } = useAuth()
+  const location = useLocation()
+
+  if (location.pathname === '/privacy-policy') return <PrivacyPolicyPage />
+  if (location.pathname === '/terms-of-service') return <TermsOfServicePage />
 
   if (loading) {
     return (
