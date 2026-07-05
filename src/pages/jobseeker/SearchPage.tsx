@@ -15,6 +15,10 @@ import { extractPdfText } from '../../lib/pdf'
 
 type JobWithMatch = JobResult & { matchResult?: MatchResult; platform?: string }
 
+const PLATFORM_LABELS: Record<string, string> = {
+  linkedin: 'LinkedIn', naukri: 'Naukri', indeed: 'Indeed', all: 'All Platforms',
+}
+
 export default function SearchPage() {
   const { profile, refreshProfile, isFeatureEnabled } = useAuth()
   const navigate = useNavigate()
@@ -135,6 +139,11 @@ export default function SearchPage() {
       toast.error(`Need ${allPlatformCost} credits for All Platforms. Balance: ${profile.wallet_credits}`)
       return
     }
+    const indeedCost = features.find(f => f.feature === 'indeed')?.credit_cost ?? 10
+    if (config.platform === 'indeed' && profile.wallet_credits < indeedCost) {
+      toast.error(`Need ${indeedCost} credits for Indeed. Balance: ${profile.wallet_credits}`)
+      return
+    }
     setRunning(true)
     setRunningConfigId(config.id)
     setStage('connecting')
@@ -145,7 +154,7 @@ export default function SearchPage() {
       setRunning(false); setRunningConfigId(null); return
     }
     setStage('connected')
-    toast.success('Connected to Apify — search started')
+    toast.success('Connected to Apify — search started. This can take up to 3 minutes.')
     const { data: run } = await supabase.from('job_runs').select('*').eq('id', data.run_id).single()
     if (run) setCurrentRun(run as JobRun)
     setTimeout(() => setStage('waiting'), 1200)
@@ -198,6 +207,11 @@ export default function SearchPage() {
   }
 
   const filteredJobs = platformFilter === 'all' ? jobs : jobs.filter(j => (j as any).platform === platformFilter)
+  // Multi-source runs (the dedicated "All Platforms" actor, or any actor
+  // that tags results with their real originating platform) can surface more
+  // than one distinct platform in a single run's results — only then is a
+  // sub-filter meaningful to show.
+  const distinctResultPlatforms = [...new Set(jobs.map(j => (j as any).platform).filter(Boolean))]
   const runningConfig = configs.find(c => c.id === runningConfigId)
   const lastRunConfig = configs.find(c => c.id === currentRun?.search_config_id)
 
@@ -205,7 +219,7 @@ export default function SearchPage() {
     <div>
       <PageHeader
         title="Search Jobs"
-        description="AI-powered search across LinkedIn and Naukri — save up to 3 searches and run any of them"
+        description="AI-powered search across LinkedIn, Naukri, and Indeed — save up to 3 searches and run any of them"
         action={
           <Button variant="ghost" onClick={() => navigate('/settings/search')}>
             Manage Searches <ChevronRight className="w-3.5 h-3.5" />
@@ -252,8 +266,9 @@ export default function SearchPage() {
                 {stage === 'waiting' && 'Getting search results...'}
               </p>
               <p className="text-sm text-slate-500 mt-0.5">
-                {runningConfig?.name ?? 'Search'} · Scraping {runningConfig?.platform === 'all' ? 'LinkedIn & Naukri' : runningConfig?.platform} · Running for {formatElapsed(elapsed)}
+                {runningConfig?.name ?? 'Search'} · Scraping {PLATFORM_LABELS[runningConfig?.platform ?? ''] ?? runningConfig?.platform} · Running for {formatElapsed(elapsed)}
               </p>
+              <p className="text-xs text-slate-600 mt-1">Please wait for the results — this can take up to 3 minutes.</p>
             </div>
             <div className="ml-auto flex items-center gap-2">
               {[0, 300, 600].map(delay => (
@@ -286,8 +301,8 @@ export default function SearchPage() {
           {(currentRun?.apify_run_id || currentRun?.apify_run_id_2) && (
             <div className="mt-3 pt-3 border-t border-slate-700/50 text-xs text-slate-500 space-y-1">
               <p>Verify directly in your Apify Console → Actors → Runs tab, searching by Run ID:</p>
-              {currentRun?.apify_run_id && <p className="font-mono text-slate-400">LinkedIn: {currentRun.apify_run_id}</p>}
-              {currentRun?.apify_run_id_2 && <p className="font-mono text-slate-400">Naukri: {currentRun.apify_run_id_2}</p>}
+              {currentRun?.apify_run_id && <p className="font-mono text-slate-400">Run ID: {currentRun.apify_run_id}</p>}
+              {currentRun?.apify_run_id_2 && <p className="font-mono text-slate-400">Run ID 2: {currentRun.apify_run_id_2}</p>}
             </div>
           )}
         </Card>
@@ -303,14 +318,14 @@ export default function SearchPage() {
                 <Badge label={`Last run ${formatDateTime(currentRun.completed_at)}`} variant="gray" />
               )}
             </div>
-            {currentRun?.platform === 'all' && (
+            {distinctResultPlatforms.length > 1 && (
               <div className="flex gap-2">
-                {['all', 'linkedin', 'naukri'].map(p => (
+                {['all', ...distinctResultPlatforms].map(p => (
                   <button key={p} onClick={() => setPlatformFilter(p)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       platformFilter === p ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30' : 'text-slate-500 hover:text-slate-300'
                     }`}>
-                    {p === 'all' ? 'All' : p === 'linkedin' ? 'LinkedIn' : 'Naukri'}
+                    {p === 'all' ? 'All' : PLATFORM_LABELS[p] ?? p}
                   </button>
                 ))}
               </div>

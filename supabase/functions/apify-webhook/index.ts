@@ -45,8 +45,7 @@ serve(async (req) => {
     const items = await datasetRes.json()
 
     if (!Array.isArray(items) || items.length === 0) {
-      // Check if both runs are done (for 'all' platform)
-      await checkAndCompleteRun(supabase, runId, run.platform)
+      await checkAndCompleteRun(supabase, runId)
       return new Response('ok', { status: 200 })
     }
 
@@ -62,7 +61,11 @@ serve(async (req) => {
       .map((item: any) => ({
         run_id: runId,
         user_id: run.user_id,
-        platform,
+        // If the actor tags each item with its real source (relevant for the
+        // dedicated "All Platforms" actor, which may pull from more than one
+        // site per run), preserve that; otherwise fall back to the run's
+        // platform tag, matching single-source actor behavior.
+        platform: item.platform ?? item.source ?? platform,
         title: item.title ?? '',
         company: item.company ?? '',
         location: item.location ?? item.searchLocation ?? '',
@@ -81,7 +84,7 @@ serve(async (req) => {
       await supabase.from('job_results').insert(toInsert)
     }
 
-    await checkAndCompleteRun(supabase, runId, run.platform)
+    await checkAndCompleteRun(supabase, runId)
     return new Response('ok', { status: 200 })
 
   } catch (err: any) {
@@ -91,21 +94,16 @@ serve(async (req) => {
   }
 })
 
-async function checkAndCompleteRun(supabase: any, runId: string, platform: string) {
-  // For 'all' platform, we need both webhooks to have fired before marking complete
+async function checkAndCompleteRun(supabase: any, runId: string) {
   const { count } = await supabase.from('job_results').select('id', { count: 'exact' }).eq('run_id', runId)
 
   // Get current run
   const { data: run } = await supabase.from('job_runs').select('*').eq('id', runId).single()
   if (!run) return
 
-  if (platform === 'all') {
-    // Mark complete only when we have received results from both actors
-    // Simple approach: check if both apify_run_id and apify_run_id_2 are set and at least some time has passed
-    const elapsed = Date.now() - new Date(run.created_at).getTime()
-    if (elapsed < 30000) return // Wait at least 30s before completing for 'all' platform
-  }
-
+  // Every platform — including "all", which now calls its own single
+  // dedicated multi-platform actor — fires exactly one webhook per run, so
+  // there's nothing to wait on beyond that one call completing.
   await supabase.from('job_runs').update({
     status: 'completed',
     result_count: count ?? 0,

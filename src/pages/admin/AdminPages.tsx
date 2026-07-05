@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Save, Key, ExternalLink, Users, ToggleLeft, ToggleRight, Coins, Shield, CheckCircle, Wallet, TrendingUp, TrendingDown } from 'lucide-react'
+import { Save, Key, ExternalLink, Users, ToggleLeft, ToggleRight, Coins, Shield, CheckCircle, Wallet, TrendingUp, TrendingDown, Link2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { PageHeader, Card, Button, Input, Badge, StatCard, PageLoading, Modal } from '../../components/ui'
-import type { FeatureConfig, AffiliateKey, Profile, CreditLedgerEntry } from '../../types'
+import type { FeatureConfig, AffiliateKey, ActorConfig, Profile, CreditLedgerEntry } from '../../types'
 import { ALWAYS_ON_FEATURES } from '../../types'
 import { formatDateTime } from '../../lib/constants'
 
@@ -39,8 +39,11 @@ export function AdminFeaturesPage() {
     apply: 'Clicking Apply on a job card',
     match: 'AI resume matching with Groq',
     customize: 'AI resume customization with Groq',
-    all_platforms: 'Searching both LinkedIn + Naukri simultaneously',
+    all_platforms: 'Searching all supported platforms at once via a dedicated Apify actor',
+    indeed: 'Running a job search against Indeed',
     wallet: 'Buying credits via Razorpay — turn off if the payment gateway is unavailable',
+    ats_evaluator: 'Resume scoring against ATS best practices — turning this off also disables Rewrite My Resume',
+    ats_rewrite: 'AI-powered resume rewrite with Groq (requires ATS Evaluator to also be enabled)',
   }
 
   if (loading) return <PageLoading />
@@ -203,6 +206,100 @@ export function AdminAffiliateKeysPage() {
             </Card>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────
+// ACTOR CONFIGURATION
+// ─────────────────────────────────────────
+
+// Admins tend to paste the full Apify console URL rather than the bare
+// "username/actor-name" slug the API needs — accept either and normalize.
+function normalizeActorId(input: string): string {
+  const trimmed = input.trim()
+  const match = trimmed.match(/apify\.com\/([^/?#]+\/[^/?#]+)/)
+  return match ? match[1] : trimmed
+}
+
+export function AdminActorConfigPage() {
+  const [actors, setActors] = useState<ActorConfig[]>([])
+  const [saving, setSaving] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    const { data } = await supabase.from('actor_config').select('*').order('platform')
+    if (data) setActors(data as ActorConfig[])
+    setLoading(false)
+  }
+
+  async function save(a: ActorConfig) {
+    const actor_id = normalizeActorId(a.actor_id)
+    if (!actor_id) { toast.error('Actor ID cannot be empty'); return }
+    setSaving(a.id)
+    await supabase.from('actor_config').update({ actor_id }).eq('id', a.id)
+    setSaving(null)
+    toast.success(`${platformInfo[a.platform]?.label ?? a.platform} actor updated`)
+    load()
+  }
+
+  function update(id: string, value: string) {
+    setActors(prev => prev.map(a => a.id === id ? { ...a, actor_id: value } : a))
+  }
+
+  const platformInfo: Record<string, { label: string; desc: string }> = {
+    linkedin: { label: 'LinkedIn', desc: 'Used when a user searches LinkedIn' },
+    naukri: { label: 'Naukri', desc: 'Used when a user searches Naukri' },
+    indeed: { label: 'Indeed', desc: 'Used when a user searches Indeed' },
+    all: { label: 'All Platforms', desc: 'Dedicated actor used for the "All Platforms" search — scrapes multiple sources in one run' },
+  }
+
+  if (loading) return <PageLoading />
+
+  return (
+    <div>
+      <PageHeader title="Actor Configuration" description="Set the Apify actor used for each search platform — update here if an actor is renamed or replaced, no code changes needed" />
+
+      <div className="space-y-4 max-w-2xl">
+        {actors.map(a => {
+          const info = platformInfo[a.platform]
+          return (
+            <Card key={a.id}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center">
+                  <Link2 className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-200">{info?.label ?? a.platform}</p>
+                  <p className="text-xs text-slate-600">{info?.desc}</p>
+                </div>
+              </div>
+
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <Input
+                    label="Apify Actor ID"
+                    value={a.actor_id}
+                    onChange={e => update(a.id, e.target.value)}
+                    placeholder="username/actor-name"
+                  />
+                </div>
+                <Button onClick={() => save(a)} loading={saving === a.id}>
+                  <Save className="w-4 h-4" /> Save
+                </Button>
+              </div>
+            </Card>
+          )
+        })}
+      </div>
+
+      <div className="mt-6 glass-card p-4 max-w-2xl">
+        <p className="text-xs text-slate-500 leading-relaxed">
+          <strong className="text-slate-400">Note:</strong> Paste either the actor's <code className="text-slate-400">username/actor-name</code> slug or its full apify.com URL — either is accepted and normalized on save. Changes take effect on the next search; no deployment needed.
+        </p>
       </div>
     </div>
   )

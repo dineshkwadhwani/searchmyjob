@@ -6,6 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Turn a raw Groq error into a message the user can actually act on.
+// Falls back to an optimistic "check your account" message for anything
+// we can't confidently classify, rather than showing raw API text.
+function classifyGroqError(status: number, data: any): string {
+  const raw = data?.error?.message ?? ''
+  if (status === 429) {
+    const isDaily = /per day|daily|tpd|rpd/i.test(raw)
+    if (isDaily) {
+      return "You've reached today's Groq usage limit for your account. Please try again tomorrow, or upgrade your Groq plan for higher limits."
+    }
+    return 'Groq is temporarily rate-limiting your requests. Please wait a moment and try again.'
+  }
+  if (status === 401) {
+    return 'Your Groq API key appears to be invalid or expired. Please check your Groq account and update your API key in Settings.'
+  }
+  return `We couldn't complete this request with Groq. Please check your Groq account budget and that your API key hasn't expired, then try again.${raw ? ` (Groq said: ${raw})` : ''}`
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -75,7 +93,7 @@ Return this exact JSON structure (no markdown, no extra text):
     })
 
     const groqData = await groqRes.json()
-    if (!groqRes.ok) throw new Error(groqData?.error?.message ?? 'Groq API error')
+    if (!groqRes.ok) throw new Error(classifyGroqError(groqRes.status, groqData))
 
     const raw = groqData.choices[0].message.content.trim()
     const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())

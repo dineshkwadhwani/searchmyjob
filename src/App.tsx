@@ -16,8 +16,9 @@ import JobBucketPage from './pages/jobseeker/JobBucketPage'
 import WalletPage from './pages/jobseeker/WalletPage'
 import CustomizePage from './pages/jobseeker/CustomizePage'
 import CustomizedResumesPage from './pages/jobseeker/CustomizedResumesPage'
+import AtsEvaluatorPage from './pages/jobseeker/AtsEvaluatorPage'
 import { ResumeSettings, SearchSettings, ApifySettings, GroqSettings } from './pages/jobseeker/SettingsPages'
-import { AdminFeaturesPage, AdminAffiliateKeysPage, AdminUsersPage } from './pages/admin/AdminPages'
+import { AdminFeaturesPage, AdminAffiliateKeysPage, AdminActorConfigPage, AdminUsersPage } from './pages/admin/AdminPages'
 
 const queryClient = new QueryClient()
 
@@ -98,6 +99,7 @@ function AppRoutes() {
             <Route path="/" element={<Navigate to="/admin/features" replace />} />
             <Route path="/admin/features" element={<AdminFeaturesPage />} />
             <Route path="/admin/affiliate-keys" element={<AdminAffiliateKeysPage />} />
+            <Route path="/admin/actor-config" element={<AdminActorConfigPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="*" element={<Navigate to="/admin/features" replace />} />
           </>
@@ -110,6 +112,7 @@ function AppRoutes() {
             <Route path="/wallet" element={isFeatureEnabled('wallet') ? <WalletPage /> : <Navigate to="/dashboard" replace />} />
             <Route path="/customized-resumes" element={isFeatureEnabled('customize') ? <CustomizedResumesPage /> : <Navigate to="/dashboard" replace />} />
             <Route path="/customize/:jobId" element={isFeatureEnabled('customize') ? <CustomizePage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/ats-evaluator" element={isFeatureEnabled('ats_evaluator') ? <AtsEvaluatorPage /> : <Navigate to="/dashboard" replace />} />
             <Route path="/settings/resume" element={<ResumeSettings />} />
             <Route path="/settings/search" element={<SearchSettings />} />
             <Route path="/settings/apify" element={<ApifySettings />} />

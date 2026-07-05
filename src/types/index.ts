@@ -1,10 +1,10 @@
 export type UserRole = 'superadmin' | 'jobseeker'
 export type RunStatus = 'pending' | 'running' | 'completed' | 'failed'
-export type SearchPlatform = 'linkedin' | 'naukri' | 'all'
+export type SearchPlatform = 'linkedin' | 'naukri' | 'indeed' | 'all'
 export type TimeFrame = 'r86400' | 'r172800' | 'r604800' | 'r1296000'
-export type FeatureName = 'search' | 'apply' | 'match' | 'customize' | 'all_platforms' | 'wallet'
+export type FeatureName = 'search' | 'apply' | 'match' | 'customize' | 'all_platforms' | 'indeed' | 'wallet' | 'ats_evaluator' | 'ats_rewrite'
 export const ALWAYS_ON_FEATURES: FeatureName[] = ['search', 'apply']
-export type CreditTxType = 'topup' | 'search' | 'apply' | 'match' | 'customize' | 'refund' | 'admin_grant' | 'signup_bonus'
+export type CreditTxType = 'topup' | 'search' | 'apply' | 'match' | 'customize' | 'refund' | 'admin_grant' | 'signup_bonus' | 'ats_rewrite'
 
 export interface Profile {
   id: string
@@ -130,6 +130,13 @@ export interface AffiliateKey {
   referral_code?: string
   instructions?: string
   created_at: string
+  updated_at: string
+}
+
+export interface ActorConfig {
+  id: string
+  platform: SearchPlatform
+  actor_id: string
   updated_at: string
 }
 

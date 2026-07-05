@@ -4,15 +4,16 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Search, Briefcase, FileText, Wallet,
   Users, Key, Sliders, LogOut, Menu, X,
-  Sparkles, ChevronRight, Coins, LayoutDashboard,
+  Sparkles, ChevronRight, Coins, LayoutDashboard, ScanSearch, Link2,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import type { FeatureName } from '../../types'
 
 const adminNav = [
-  { to: '/admin/features',       label: 'Feature Config',  icon: <Sliders className="w-4 h-4" /> },
-  { to: '/admin/affiliate-keys', label: 'Affiliate Keys',  icon: <Key className="w-4 h-4" /> },
-  { to: '/admin/users',          label: 'Manage Users',    icon: <Users className="w-4 h-4" /> },
+  { to: '/admin/features',       label: 'Feature Config',     icon: <Sliders className="w-4 h-4" /> },
+  { to: '/admin/actor-config',   label: 'Actor Configuration', icon: <Link2 className="w-4 h-4" /> },
+  { to: '/admin/affiliate-keys', label: 'Affiliate Keys',     icon: <Key className="w-4 h-4" /> },
+  { to: '/admin/users',          label: 'Manage Users',       icon: <Users className="w-4 h-4" /> },
 ]
 
 const jobseekerNav: { to: string; label: string; icon: ReactNode; isPremium?: boolean; feature?: FeatureName }[] = [
@@ -21,6 +22,7 @@ const jobseekerNav: { to: string; label: string; icon: ReactNode; isPremium?: bo
   { to: '/job-bucket',  label: 'Job Bucket',        icon: <Briefcase className="w-4 h-4" />, feature: 'apply' },
   { to: '/wallet',      label: 'Wallet',            icon: <Wallet className="w-4 h-4" />,   feature: 'wallet' },
   { to: '/customized-resumes', label: 'AI Resumes', icon: <FileText className="w-4 h-4" />, isPremium: true, feature: 'customize' },
+  { to: '/ats-evaluator', label: 'ATS Evaluator', icon: <ScanSearch className="w-4 h-4" />, isPremium: true, feature: 'ats_evaluator' },
 ]
 
 const settingsNav = [
@@ -30,9 +32,9 @@ const settingsNav = [
   { to: '/settings/groq',   label: 'Groq Key' },
 ]
 
-function NavItem({ to, label, icon, isPremium }: { to: string; label: string; icon: ReactNode; isPremium?: boolean }) {
+function NavItem({ to, label, icon, isPremium, onClick }: { to: string; label: string; icon: ReactNode; isPremium?: boolean; onClick?: () => void }) {
   return (
-    <NavLink to={to} className={({ isActive }) =>
+    <NavLink to={to} onClick={onClick} className={({ isActive }) =>
       `group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium leading-none transition-all duration-150 ${
         isActive
           ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30'
@@ -74,7 +76,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       {/* Credits pill (jobseeker) */}
       {!isAdmin && walletEnabled && (
         <div className="px-3 pt-3">
-          <button onClick={() => navigate('/wallet')}
+          <button onClick={() => { setOpen(false); navigate('/wallet') }}
             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600/10 to-indigo-600/10 border border-violet-500/20 hover:border-violet-500/40 transition-all group">
             <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
               <Coins className="w-4 h-4 text-violet-400" />
@@ -91,8 +93,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       {/* Nav */}
       <div className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {isAdmin
-          ? adminNav.map(n => <NavItem key={n.to} {...n} />)
-          : visibleJobseekerNav.map(n => <NavItem key={n.to} {...n} />)
+          ? adminNav.map(n => <NavItem key={n.to} {...n} onClick={() => setOpen(false)} />)
+          : visibleJobseekerNav.map(n => <NavItem key={n.to} {...n} onClick={() => setOpen(false)} />)
         }
 
         {!isAdmin && (
@@ -102,7 +104,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </div>
             <div className="space-y-0.5">
               {settingsNav.map(s => (
-                <NavLink key={s.to} to={s.to} className={({ isActive }) =>
+                <NavLink key={s.to} to={s.to} onClick={() => setOpen(false)} className={({ isActive }) =>
                   `flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs leading-none transition-all ${
                     isActive ? 'text-violet-400 bg-violet-500/10' : 'text-slate-600 hover:text-slate-400 hover:bg-slate-800/40'
                   }`}>
@@ -126,7 +128,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <p className="text-[10px] text-slate-600 capitalize">{profile?.role}</p>
           </div>
         </div>
-        <button onClick={async () => { await signOut(); navigate('/login') }}
+        <button onClick={async () => { setOpen(false); await signOut(); navigate('/login') }}
           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all">
           <LogOut className="w-4 h-4" />
           Sign out

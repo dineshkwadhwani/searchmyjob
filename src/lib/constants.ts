@@ -10,19 +10,9 @@ export const TIME_FRAME_OPTIONS: { value: TimeFrame; label: string }[] = [
 export const PLATFORM_OPTIONS: { value: SearchPlatform; label: string; isPremium?: boolean }[] = [
   { value: 'linkedin', label: 'LinkedIn' },
   { value: 'naukri',   label: 'Naukri' },
+  { value: 'indeed',   label: 'Indeed', isPremium: true },
   { value: 'all',      label: 'All Platforms', isPremium: true },
 ]
-
-// LinkedIn timeframe → Naukri timeframe mapping
-export const NAUKRI_TIME_FRAME_MAP: Record<TimeFrame, string> = {
-  r86400:  '1',
-  r172800: '2',
-  r604800: '7',
-  r1296000: '15',
-}
-
-export const LINKEDIN_ACTOR = 'dineshwadhwani/linkedin-jobs-scraper'
-export const NAUKRI_ACTOR   = 'dineshwadhwani/naukri-job-scrapper'
 
 export const MAX_ROLES     = 3
 export const MAX_LOCATIONS = 3

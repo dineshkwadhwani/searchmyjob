@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Upload, FileText, Trash2, ExternalLink, Eye, EyeOff, Save, AlertCircle, Building2 } from 'lucide-react'
+import { Upload, FileText, Trash2, ExternalLink, Eye, EyeOff, Save, AlertCircle, Building2, Globe2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
@@ -149,7 +149,12 @@ export function SearchSettings() {
   }
 
   const allPlatformsEnabled = features.find(f => f.feature === 'all_platforms')?.is_enabled !== false
-  const visiblePlatformOptions = PLATFORM_OPTIONS.filter(p => p.value !== 'all' || allPlatformsEnabled)
+  const indeedEnabled = features.find(f => f.feature === 'indeed')?.is_enabled !== false
+  const visiblePlatformOptions = PLATFORM_OPTIONS.filter(p =>
+    (p.value !== 'all' || allPlatformsEnabled) && (p.value !== 'indeed' || indeedEnabled)
+  )
+  const platformGridCols = visiblePlatformOptions.length >= 4 ? 'grid-cols-2 sm:grid-cols-4'
+    : visiblePlatformOptions.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
 
   function updateActive(patch: Partial<SearchConfig>) {
     setConfigs(prev => prev.map((c, i) => i === activeIndex ? { ...c, ...patch } : c))
@@ -267,7 +272,7 @@ export function SearchSettings() {
               options={TIME_FRAME_OPTIONS} />
             <div className="space-y-1.5">
               <label className="label">Platform</label>
-              <div className={`grid gap-2 ${visiblePlatformOptions.length >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              <div className={`grid gap-2 ${platformGridCols}`}>
                 {visiblePlatformOptions.map(p => (
                   <button key={p.value} type="button"
                     onClick={() => updateActive({ platform: p.value as any })}
@@ -277,7 +282,8 @@ export function SearchSettings() {
                         : 'border-slate-700 bg-slate-800/50 text-slate-500 hover:border-slate-600'
                     }`}>
                     {p.value === 'all' && <span className="text-lg leading-none block mb-1">⚡</span>}
-                    {p.value !== 'all' && <Building2 className="w-4 h-4 mx-auto mb-1" />}
+                    {p.value === 'indeed' && <Globe2 className="w-4 h-4 mx-auto mb-1" />}
+                    {p.value !== 'all' && p.value !== 'indeed' && <Building2 className="w-4 h-4 mx-auto mb-1" />}
                     <span className="block text-xs">{p.label}</span>
                     {p.isPremium && (
                       <span className="absolute -top-1.5 -right-1.5 text-[9px] px-1 py-0.5 bg-amber-500 text-black rounded font-bold">PRO</span>
@@ -288,6 +294,11 @@ export function SearchSettings() {
               {active.platform === 'all' && (
                 <p className="text-xs text-amber-400 flex items-center gap-1 mt-1">
                   ⚡ Costs {getFeatureCost('all_platforms')} extra credits per search
+                </p>
+              )}
+              {active.platform === 'indeed' && (
+                <p className="text-xs text-amber-400 flex items-center gap-1 mt-1">
+                  ⚡ Costs {getFeatureCost('indeed')} extra credits per search
                 </p>
               )}
             </div>
@@ -431,8 +442,8 @@ export function GroqSettings() {
     <div>
       <PageHeader title="Groq Settings" description="Connect Groq AI for resume matching and customization" />
       <div className="max-w-xl space-y-6">
-        <Card className="bg-amber-500/5 border-amber-500/20">
-          <p className="text-sm font-semibold text-amber-300 mb-2">Why do I need this?</p>
+        <Card className="bg-violet-500/5 border-violet-500/20">
+          <p className="text-sm font-semibold text-violet-300 mb-2">Why do I need this?</p>
           <p className="text-xs text-slate-500 mb-4 leading-relaxed">
             You'll need to connect a Groq AI account to match your profile against jobs. Groq is free
             and gives you enough credits to match and score your profile against jobs of your choice.

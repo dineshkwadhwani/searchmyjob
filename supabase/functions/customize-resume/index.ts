@@ -6,6 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Turn a raw Groq error into a message the user can actually act on.
+// Falls back to an optimistic "check your account" message for anything
+// we can't confidently classify, rather than showing raw API text.
+function classifyGroqError(status: number, data: any): string {
+  const raw = data?.error?.message ?? ''
+  if (status === 429) {
+    const isDaily = /per day|daily|tpd|rpd/i.test(raw)
+    if (isDaily) {
+      return "You've reached today's Groq usage limit for your account. Please try again tomorrow, or upgrade your Groq plan for higher limits."
+    }
+    return 'Groq is temporarily rate-limiting your requests. Please wait a moment and try again.'
+  }
+  if (status === 401) {
+    return 'Your Groq API key appears to be invalid or expired. Please check your Groq account and update your API key in Settings.'
+  }
+  return `We couldn't complete this request with Groq. Please check your Groq account budget and that your API key hasn't expired, then try again.${raw ? ` (Groq said: ${raw})` : ''}`
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -41,7 +59,7 @@ serve(async (req) => {
     const { data: resume } = await supabase.from('resumes').select('*').eq('user_id', user.id).eq('is_active', true).single()
     if (!resume) return Response.json({ error: 'No active resume found' }, { headers: corsHeaders })
 
-    const prompt = `You are an expert resume writer and ATS optimization specialist. Rewrite the candidate's resume to be perfectly tailored for this specific job posting.
+    const prompt = `You are an expert resume writer and ATS optimization specialist. Rewrite the candidate's resume to be tailored for this specific job posting, while preserving the FULL content and structure of the original. This is a rewrite for tone, emphasis, and keywords — NOT a summary.
 
 JOB TARGET:
 Title: ${job.title}
@@ -51,14 +69,17 @@ Location: ${job.location ?? 'Not specified'}
 ORIGINAL RESUME:
 ${resume_text}
 
-INSTRUCTIONS:
-1. Keep ALL real experience, education, and skills — do not fabricate anything
-2. Reorder and emphasize sections to highlight most relevant experience first
-3. Rewrite bullet points to use keywords from the job title and context
-4. Use strong action verbs and quantify achievements where possible
-5. Ensure the resume is ATS-friendly
-6. Return ONLY clean HTML (no markdown, no code blocks)
-7. Use these HTML elements: <h1> for name, <h2> for sections, <h3> for job titles, <p> and <ul><li> for content
+CRITICAL RULES — do not violate these:
+1. Do NOT omit, drop, merge, or condense away any job, role, internship, project, certification, degree, or skill that appears in the original resume. Every single entry in the original must also appear in the output.
+2. Do NOT shorten the resume overall. If a job in the original has 4 bullet points, your rewritten version of that job must also have around 4 bullet points — not 1 or 2. Match the original's level of detail and length, section by section.
+3. Do NOT fabricate anything — only rephrase, reorder, and re-emphasize real content that is already present in the original resume.
+4. You MAY reorder sections and bullet points to put the most relevant experience first, and you MAY rephrase wording to naturally include keywords from the job title/description — but every original section and entry must still be present somewhere in the output.
+5. Use strong, quantified action verbs when rephrasing — but do not invent numbers or facts that aren't implied by the original text.
+6. Ensure the resume is ATS-friendly: clean structure, standard section headers, no tables or multi-column layouts.
+7. Return ONLY clean HTML (no markdown, no code blocks, no commentary before or after the HTML).
+8. Use these HTML elements: <h1> for name, <h2> for section headers, <h3> for job titles/company/degree, <p> for summary or paragraph text, <ul><li> for bullet points.
+
+Before returning your answer, re-check it against the original resume: does every job, degree, certification, and skill from the original still appear in your output? If anything is missing, add it back before responding.
 
 Return only the HTML content, starting with <h1>:`
 
@@ -68,13 +89,17 @@ Return only the HTML content, starting with <h1>:`
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 3000,
+        max_tokens: 6000,
         temperature: 0.3,
       })
     })
 
     const groqData = await groqRes.json()
-    if (!groqRes.ok) throw new Error(groqData?.error?.message ?? 'Groq API error')
+    if (!groqRes.ok) throw new Error(classifyGroqError(groqRes.status, groqData))
+
+    if (groqData.choices[0].finish_reason === 'length') {
+      throw new Error('The customized resume was cut off because it hit the AI\'s output limit. Please try again — if this keeps happening, your master resume may be too long for a single rewrite.')
+    }
 
     let htmlContent = groqData.choices[0].message.content.trim()
     // Strip any accidental markdown code fences

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Wand2, Download, ArrowLeft, Sparkles, FileText, Loader2, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -12,13 +12,13 @@ export default function CustomizePage() {
   const { jobId } = useParams<{ jobId: string }>()
   const { profile, refreshProfile } = useAuth()
   const navigate = useNavigate()
-  const printRef = useRef<HTMLDivElement>(null)
 
   const [job, setJob] = useState<JobResult | null>(null)
   const [existing, setExisting] = useState<CustomizedResume | null>(null)
   const [features, setFeatures] = useState<FeatureConfig[]>([])
   const [customizing, setCustomizing] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
 
   const customizeCost = features.find(f => f.feature === 'customize')?.credit_cost ?? 10
 
@@ -66,31 +66,17 @@ export default function CustomizePage() {
     }
   }
 
-  function handleDownloadPDF() {
-    if (!printRef.current) return
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Customized Resume</title>
-          <style>
-            body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; color: #111; padding: 40px; max-width: 750px; margin: 0 auto; }
-            h1 { font-size: 18pt; border-bottom: 2px solid #333; padding-bottom: 6px; }
-            h2 { font-size: 13pt; border-bottom: 1px solid #aaa; padding-bottom: 3px; margin-top: 20px; }
-            h3 { font-size: 11pt; font-weight: bold; margin: 10px 0 2px; }
-            ul { margin: 4px 0; padding-left: 18px; }
-            li { margin: 2px 0; }
-            .section { margin-bottom: 16px; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>${printRef.current.innerHTML}</body>
-      </html>
-    `)
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => { printWindow.print(); printWindow.close() }, 300)
+  async function handleDownloadPDF() {
+    if (!existing) return
+    setDownloading(true)
+    try {
+      const { downloadResumeAsPdf } = await import('../../lib/resumePdf')
+      await downloadResumeAsPdf(existing.customized_content, 'Customized-Resume.pdf')
+    } catch {
+      toast.error('Could not generate the PDF. Please try again.')
+    } finally {
+      setDownloading(false)
+    }
   }
 
   if (loading) return <PageLoading />
@@ -181,7 +167,7 @@ export default function CustomizePage() {
                 <Badge label={`Expires in ${daysLeft} days`} variant={daysLeft < 7 ? 'yellow' : 'gray'} />
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleDownloadPDF} className="flex-1">
+                <Button onClick={handleDownloadPDF} loading={downloading} disabled={downloading} className="flex-1">
                   <Download className="w-4 h-4" /> Download PDF
                 </Button>
                 <Button variant="secondary" onClick={handleCustomize} loading={customizing}>
@@ -199,13 +185,12 @@ export default function CustomizePage() {
               <p className="text-sm font-semibold text-slate-300 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-violet-400" /> Customized Resume Preview
               </p>
-              <Button variant="ghost" size="sm" onClick={handleDownloadPDF}>
+              <Button variant="ghost" size="sm" onClick={handleDownloadPDF} loading={downloading} disabled={downloading}>
                 <Download className="w-3.5 h-3.5" /> Save as PDF
               </Button>
             </div>
             <div className="glass-card p-6 max-h-[600px] overflow-y-auto">
               <div
-                ref={printRef}
                 className="prose prose-sm prose-invert max-w-none text-slate-300 leading-relaxed"
                 dangerouslySetInnerHTML={{ __html: existing.customized_content }}
               />

@@ -121,6 +121,7 @@ export default function DashboardPage() {
           title="Resume"
           description="Upload your resume to enable AI matching and customization."
           isReady={hasResume}
+          readyLabel="Uploaded" notReadyLabel="Not Uploaded"
           actionLabel="Upload Resume"
           onAction={() => navigate('/settings/resume')}
         />
@@ -129,6 +130,7 @@ export default function DashboardPage() {
           title="Search Config"
           description="Set your target roles, locations and search preferences."
           isReady={hasConfig}
+          readyLabel="Configured" notReadyLabel="Not Configured"
           actionLabel="Configure Search"
           onAction={() => navigate('/settings/search')}
         />
@@ -137,6 +139,7 @@ export default function DashboardPage() {
       <DashboardSection title="Activity">
         <ActivityTile
           icon={<Coins className="w-5 h-5" />}
+          title="Wallet"
           value={credits}
           label="Available Credits"
           badge={credits === 0 ? { label: 'Empty', variant: 'yellow' } : { label: 'Active', variant: 'green' }}
@@ -145,6 +148,7 @@ export default function DashboardPage() {
         />
         <ActivityTile
           icon={<Briefcase className="w-5 h-5" />}
+          title="Applied"
           value={appliedCount}
           label="Total Jobs Applied"
           actionLabel="View"
@@ -152,6 +156,7 @@ export default function DashboardPage() {
         />
         <ActivityTile
           icon={<Wand2 className="w-5 h-5" />}
+          title="Customized Resume"
           value={customizedCount}
           label="Customized Resumes"
           actionLabel={isFeatureEnabled('customize') ? 'View' : undefined}
@@ -171,8 +176,9 @@ function DashboardSection({ title, children }: { title: string; children: ReactN
   )
 }
 
-function StatusTile({ icon, title, description, isReady, actionLabel, onAction }: {
+function StatusTile({ icon, title, description, isReady, readyLabel = 'Connected', notReadyLabel = 'Not Set Up', actionLabel, onAction }: {
   icon: ReactNode; title: string; description: string; isReady: boolean
+  readyLabel?: string; notReadyLabel?: string
   actionLabel: string; onAction: () => void
 }) {
   return (
@@ -183,9 +189,9 @@ function StatusTile({ icon, title, description, isReady, actionLabel, onAction }
         }`}>
           {icon}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex items-center gap-2 flex-wrap">
           <p className="font-semibold text-slate-200 text-sm truncate">{title}</p>
-          <Badge label={isReady ? 'Connected' : 'Not Set Up'} variant={isReady ? 'green' : 'red'} />
+          <Badge label={isReady ? readyLabel : notReadyLabel} variant={isReady ? 'green' : 'red'} />
         </div>
       </div>
       <p className="text-xs text-slate-500 mb-4 flex-1">{description}</p>
@@ -198,18 +204,21 @@ function StatusTile({ icon, title, description, isReady, actionLabel, onAction }
   )
 }
 
-function ActivityTile({ icon, value, label, badge, actionLabel, onAction }: {
-  icon: ReactNode; value: number; label: string
+function ActivityTile({ icon, title, value, label, badge, actionLabel, onAction }: {
+  icon: ReactNode; title: string; value: number; label: string
   badge?: { label: string; variant: 'green' | 'yellow' }
   actionLabel?: string; onAction: () => void
 }) {
   return (
     <div className="glass-card p-5 flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center text-violet-400">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center text-violet-400 flex-shrink-0">
           {icon}
         </div>
-        {badge && <Badge label={badge.label} variant={badge.variant} />}
+        <div className="min-w-0 flex items-center gap-2 flex-wrap">
+          <p className="font-semibold text-slate-200 text-sm truncate">{title}</p>
+          {badge && <Badge label={badge.label} variant={badge.variant} />}
+        </div>
       </div>
       <p className="text-2xl font-bold text-slate-100">{value}</p>
       <p className="text-xs text-slate-500 mb-4">{label}</p>
