@@ -55,19 +55,25 @@ serve(async (req) => {
       console.log('Sample dataset item keys:', Object.keys(items[0]))
     }
 
+    console.log(`Run ${runId}: Apify dataset returned ${items.length} raw items`)
+
     // Insert job results
     const toInsert = items
-      .filter((item: any) => item.title && item.company)
+      .map((item: any) => ({ ...item, _resolvedCompany: item.company ?? item.companyName ?? item.company_name ?? '' }))
+      .filter((item: any) => item.title && item._resolvedCompany)
       .map((item: any) => ({
         run_id: runId,
         user_id: run.user_id,
         // If the actor tags each item with its real source (relevant for the
         // dedicated "All Platforms" actor, which may pull from more than one
         // site per run), preserve that; otherwise fall back to the run's
-        // platform tag, matching single-source actor behavior.
-        platform: item.platform ?? item.source ?? platform,
+        // platform tag, matching single-source actor behavior. Lowercased —
+        // the multiplatform actor tags items "LinkedIn"/"Naukri" (Title Case),
+        // which doesn't match the search_platform enum's lowercase values and
+        // would otherwise fail the entire batch insert.
+        platform: (item.platform ?? item.source ?? platform).toLowerCase(),
         title: item.title ?? '',
-        company: item.company ?? '',
+        company: item._resolvedCompany,
         location: item.location ?? item.searchLocation ?? '',
         link: item.link ?? item.jobUrl ?? '',
         job_id: item.jobId ?? item.job_id ?? '',
@@ -80,8 +86,11 @@ serve(async (req) => {
         ).slice(0, 1000),
       }))
 
+    console.log(`Run ${runId}: inserting ${toInsert.length} of ${items.length} items after title/company filtering`)
+
     if (toInsert.length > 0) {
-      await supabase.from('job_results').insert(toInsert)
+      const { error: insertError } = await supabase.from('job_results').insert(toInsert)
+      if (insertError) throw new Error(`job_results insert failed: ${insertError.message}`)
     }
 
     await checkAndCompleteRun(supabase, runId)

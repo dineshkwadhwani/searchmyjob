@@ -461,7 +461,7 @@ function JobCard({ job, matchCost, customizeCost, matchEnabled, customizeEnabled
 
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             <Button variant="primary" size="sm" onClick={onApply}>
-              {job.is_applied ? <><ExternalLink className="w-3.5 h-3.5" /> View Job</> : <><BookmarkPlus className="w-3.5 h-3.5" /> Apply</>}
+              {job.is_applied ? <><ExternalLink className="w-3.5 h-3.5" /> View Job</> : <><BookmarkPlus className="w-3.5 h-3.5" /> View and Apply</>}
             </Button>
             {!hasMatch && matchEnabled && (
               <Button variant="secondary" size="sm" onClick={onMatch} loading={isMatching}

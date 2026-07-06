@@ -1,11 +1,23 @@
 import { useState, useEffect } from 'react'
-import { Save, Key, ExternalLink, Users, ToggleLeft, ToggleRight, Coins, Shield, CheckCircle, Wallet, TrendingUp, TrendingDown, Link2 } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Save, Key, ExternalLink, Users, ToggleLeft, ToggleRight, Coins, Shield, CheckCircle, Wallet, TrendingUp, TrendingDown, Link2, Plug, Sparkles, FileText, Search, Briefcase, Wand2, Mail, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { PageHeader, Card, Button, Input, Badge, StatCard, PageLoading, Modal } from '../../components/ui'
 import type { FeatureConfig, AffiliateKey, ActorConfig, Profile, CreditLedgerEntry } from '../../types'
 import { ALWAYS_ON_FEATURES } from '../../types'
 import { formatDateTime } from '../../lib/constants'
+
+interface UserSetupStatus {
+  email: string
+  apify: boolean
+  groq: boolean
+  resume: boolean
+  searchConfig: boolean
+  wallet: number
+  appliedCount: number
+  customizedCount: number
+}
 
 // ─────────────────────────────────────────
 // FEATURE CONFIG
@@ -44,6 +56,7 @@ export function AdminFeaturesPage() {
     wallet: 'Buying credits via Razorpay — turn off if the payment gateway is unavailable',
     ats_evaluator: 'Resume scoring against ATS best practices — turning this off also disables Rewrite My Resume',
     ats_rewrite: 'AI-powered resume rewrite with Groq (requires ATS Evaluator to also be enabled)',
+    profile_extract: 'AI extraction of profile fields from a resume with Groq, on the Profile page',
   }
 
   if (loading) return <PageLoading />
@@ -318,6 +331,10 @@ export function AdminUsersPage() {
   const [walletUser, setWalletUser] = useState<Profile | null>(null)
   const [ledger, setLedger] = useState<CreditLedgerEntry[]>([])
   const [ledgerLoading, setLedgerLoading] = useState(false)
+  const [statusUser, setStatusUser] = useState<Profile | null>(null)
+  const [status, setStatus] = useState<UserSetupStatus | null>(null)
+  const [statusLoading, setStatusLoading] = useState(false)
+  const [sendingHelp, setSendingHelp] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -335,6 +352,25 @@ export function AdminUsersPage() {
     const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
     if (data) setUsers(data as Profile[])
     setLoading(false)
+  }
+
+  async function openStatus(user: Profile) {
+    setStatusUser(user)
+    setStatus(null)
+    setStatusLoading(true)
+    const { data, error } = await supabase.functions.invoke('admin-user-status', { body: { user_id: user.id } })
+    if (error) toast.error(error.message)
+    else setStatus(data as UserSetupStatus)
+    setStatusLoading(false)
+  }
+
+  async function sendHelp() {
+    if (!statusUser) return
+    setSendingHelp(true)
+    const { data, error } = await supabase.functions.invoke('send-setup-help-email', { body: { user_id: statusUser.id } })
+    setSendingHelp(false)
+    if (error || data?.error) { toast.error(data?.error ?? error?.message ?? 'Failed to send email'); return }
+    toast.success(`Setup help email sent to ${statusUser.email}`)
   }
 
   async function toggleUser(user: Profile) {
@@ -406,7 +442,14 @@ export function AdminUsersPage() {
                       {user.email[0].toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-medium text-slate-200 text-sm">{user.email}</p>
+                      {user.role === 'superadmin' ? (
+                        <p className="font-medium text-slate-200 text-sm">{user.email}</p>
+                      ) : (
+                        <button onClick={() => openStatus(user)}
+                          className="font-medium text-slate-200 text-sm hover:text-violet-400 underline decoration-slate-600 hover:decoration-violet-400 transition-colors">
+                          {user.email}
+                        </button>
+                      )}
                       <Badge label={user.role} variant={user.role === 'superadmin' ? 'purple' : 'gray'} />
                     </div>
                   </div>
@@ -501,6 +544,65 @@ export function AdminUsersPage() {
           )}
         </Modal>
       )}
+
+      {statusUser && (
+        <Modal title={`${statusUser.email} — Setup Status`} onClose={() => setStatusUser(null)}>
+          {statusLoading || !status ? (
+            <PageLoading />
+          ) : (
+            <>
+              <div className="space-y-1 mb-5">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Core Services</p>
+                <StatusRow icon={<Plug className="w-4 h-4" />} label="Apify Connector" ready={status.apify} />
+                <StatusRow icon={<Sparkles className="w-4 h-4" />} label="Groq Connector" ready={status.groq} />
+                <StatusRow icon={<FileText className="w-4 h-4" />} label="Resume" ready={status.resume} readyLabel="Uploaded" notReadyLabel="Not Uploaded" />
+                <StatusRow icon={<Search className="w-4 h-4" />} label="Search Config" ready={status.searchConfig} readyLabel="Configured" notReadyLabel="Not Configured" />
+              </div>
+
+              <div className="space-y-1 mb-5">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Activity</p>
+                <StatusRow icon={<Coins className="w-4 h-4" />} label="Wallet Credits" value={status.wallet} />
+                <StatusRow icon={<Briefcase className="w-4 h-4" />} label="Jobs Applied" value={status.appliedCount} />
+                <StatusRow icon={<Wand2 className="w-4 h-4" />} label="Customized Resumes" value={status.customizedCount} />
+              </div>
+
+              {(!status.apify || !status.groq || !status.resume || !status.searchConfig) && (
+                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                  <p className="text-sm text-amber-300 mb-3">
+                    This user is missing one or more core services and likely can't search for or apply to jobs yet.
+                  </p>
+                  <Button onClick={sendHelp} loading={sendingHelp} className="w-full">
+                    <Mail className="w-3.5 h-3.5" /> Send Help Email
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+function StatusRow({ icon, label, ready, value, readyLabel = 'Connected', notReadyLabel = 'Not Set Up' }: {
+  icon: ReactNode; label: string; ready?: boolean; value?: number
+  readyLabel?: string; notReadyLabel?: string
+}) {
+  const isActivity = value !== undefined
+  return (
+    <div className="flex items-center gap-3 py-2.5 px-1">
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+        isActivity ? 'bg-violet-500/15 text-violet-400' : ready ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
+      }`}>
+        {icon}
+      </div>
+      <p className="flex-1 text-sm text-slate-300">{label}</p>
+      {isActivity ? (
+        <span className="text-sm font-bold text-slate-100">{value}</span>
+      ) : (
+        <Badge label={ready ? readyLabel : notReadyLabel} variant={ready ? 'green' : 'red'} />
+      )}
+      {!isActivity && !ready && <XCircle className="w-4 h-4 text-red-500/60" />}
     </div>
   )
 }

@@ -34,7 +34,7 @@ export function Input({ label, error, hint, icon, className = '', ...props }: In
       {label && <label className="label">{label}</label>}
       <div className="relative">
         {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">{icon}</div>}
-        <input className={`input ${icon ? 'pl-10' : ''} ${error ? 'border-red-500/50 focus:ring-red-500/50' : ''} ${className}`} {...props} />
+        <input className={`input ${icon ? 'pl-10' : ''} ${error ? 'border-red-500/70 ring-1 ring-red-500/40 focus:border-red-500/70 focus:ring-red-500/50' : ''} ${className}`} {...props} />
       </div>
       {error && <p className="text-xs text-red-400 flex items-center gap-1">⚠ {error}</p>}
       {hint && !error && <p className="text-xs text-slate-500">{hint}</p>}
@@ -51,7 +51,7 @@ export function Select({ label, error, options, className = '', ...props }: Sele
   return (
     <div className="space-y-1.5">
       {label && <label className="label">{label}</label>}
-      <select className={`input ${error ? 'border-red-500/50' : ''} ${className}`} {...props}>
+      <select className={`input ${error ? 'border-red-500/70 ring-1 ring-red-500/40 focus:border-red-500/70 focus:ring-red-500/50' : ''} ${className}`} {...props}>
         {options.map(o => <option key={o.value} value={o.value} disabled={o.disabled} className="bg-slate-800">{o.label}</option>)}
       </select>
       {error && <p className="text-xs text-red-400">⚠ {error}</p>}
@@ -67,7 +67,7 @@ export function Textarea({ label, error, className = '', ...props }: TextareaPro
   return (
     <div className="space-y-1.5">
       {label && <label className="label">{label}</label>}
-      <textarea className={`input resize-none ${error ? 'border-red-500/50' : ''} ${className}`} {...props} />
+      <textarea className={`input resize-none ${error ? 'border-red-500/70 ring-1 ring-red-500/40 focus:border-red-500/70 focus:ring-red-500/50' : ''} ${className}`} {...props} />
       {error && <p className="text-xs text-red-400">⚠ {error}</p>}
     </div>
   )

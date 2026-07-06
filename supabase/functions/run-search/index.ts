@@ -21,6 +21,13 @@ const INDEED_TIME_MAP: Record<string, string> = {
   r86400: '1', r172800: '3', r604800: '7', r1296000: '14'
 }
 
+// Confirmed from the multiplatform actor's own validation error — it only
+// accepts "", "1", "7", "15" (Naukri's format minus the 48-hour option).
+// No 48-hour bucket, so round r172800 UP to 7 days, same convention as Indeed.
+const ALL_PLATFORMS_TIME_MAP: Record<string, string> = {
+  r86400: '1', r172800: '7', r604800: '7', r1296000: '15'
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -117,9 +124,7 @@ serve(async (req) => {
       linkedin: { ...baseFields, timeFrame: config.time_frame },
       naukri:   { ...baseFields, timeFrame: NAUKRI_TIME_MAP[config.time_frame] ?? '1' },
       indeed:   { ...baseFields, timeFrame: INDEED_TIME_MAP[config.time_frame] ?? '1', maxJobs: 100 },
-      // Best-guess input shape for the dedicated "All Platforms" actor —
-      // its exact contract hasn't been confirmed against real output yet.
-      all:      { ...baseFields, timeFrame: config.time_frame },
+      all:      { ...baseFields, timeFrame: ALL_PLATFORMS_TIME_MAP[config.time_frame] ?? '1' },
     }
 
     async function startActor(actorId: string, input: object, platform: string): Promise<string> {

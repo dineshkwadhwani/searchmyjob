@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Search, Briefcase, FileText, Wallet,
   Users, Key, Sliders, LogOut, Menu, X,
-  Sparkles, ChevronRight, Coins, LayoutDashboard, ScanSearch, Link2,
+  Sparkles, ChevronRight, Coins, LayoutDashboard, ScanSearch, Link2, UserCircle,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import type { FeatureName } from '../../types'
@@ -18,6 +18,7 @@ const adminNav = [
 
 const jobseekerNav: { to: string; label: string; icon: ReactNode; isPremium?: boolean; feature?: FeatureName }[] = [
   { to: '/dashboard',   label: 'Dashboard',        icon: <LayoutDashboard className="w-4 h-4" /> },
+  { to: '/profile',     label: 'Profile',          icon: <UserCircle className="w-4 h-4" /> },
   { to: '/search',      label: 'Search Jobs',      icon: <Search className="w-4 h-4" />,   feature: 'search' },
   { to: '/job-bucket',  label: 'Job Bucket',        icon: <Briefcase className="w-4 h-4" />, feature: 'apply' },
   { to: '/wallet',      label: 'Wallet',            icon: <Wallet className="w-4 h-4" />,   feature: 'wallet' },

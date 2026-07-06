@@ -8,9 +8,11 @@ import { Spinner } from './components/ui'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage'
 import TermsOfServicePage from './pages/legal/TermsOfServicePage'
 import DashboardPage from './pages/jobseeker/DashboardPage'
+import ProfilePage from './pages/jobseeker/ProfilePage'
 import SearchPage from './pages/jobseeker/SearchPage'
 import JobBucketPage from './pages/jobseeker/JobBucketPage'
 import WalletPage from './pages/jobseeker/WalletPage'
@@ -28,6 +30,7 @@ function AppRoutes() {
 
   if (location.pathname === '/privacy-policy') return <PrivacyPolicyPage />
   if (location.pathname === '/terms-of-service') return <TermsOfServicePage />
+  if (location.pathname === '/reset-password') return <ResetPasswordPage />
 
   if (loading) {
     return (
@@ -107,6 +110,7 @@ function AppRoutes() {
           <>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/job-bucket" element={<JobBucketPage />} />
             <Route path="/wallet" element={isFeatureEnabled('wallet') ? <WalletPage /> : <Navigate to="/dashboard" replace />} />
