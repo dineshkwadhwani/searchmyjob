@@ -1,0 +1,53 @@
+name: Build iOS Simulator App
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allows you to trigger the build manually from the GitHub Actions tab
+
+jobs:
+  build:
+    name: Build iOS App (Simulator)
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Sync with Capacitor
+        run: npx cap sync ios
+
+      - name: Build Xcode Simulator App
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace \
+                     -scheme App \
+                     -sdk iphonesimulator \
+                     -configuration Debug \
+                     -derivedDataPath build-dir \
+                     CODE_SIGNING_ALLOWED=NO
+
+      - name: Package App Bundle for Appetize
+        run: |
+          cd build-dir/Build/Products/Debug-iphonesimulator
+          zip -r SearchMyJob-Simulator.zip App.app
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-build
+          path: build-dir/Build/Products/Debug-iphonesimulator/SearchMyJob-Simulator.zip
+          retention-days: 5
