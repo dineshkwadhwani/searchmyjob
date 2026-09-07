@@ -1,4 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -27,6 +30,32 @@ const queryClient = new QueryClient()
 function AppRoutes() {
   const { user, profile, loading, profileError, isFeatureEnabled } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    let listener: any = null
+    CapApp.addListener('backButton', () => {
+      const currentPath = window.location.pathname
+      if (
+        currentPath === '/dashboard' ||
+        currentPath === '/login' ||
+        currentPath === '/admin/features' ||
+        currentPath === '/'
+      ) {
+        CapApp.exitApp()
+      } else {
+        navigate(-1)
+      }
+    }).then(l => {
+      listener = l
+    })
+
+    return () => {
+      if (listener) listener.remove()
+    }
+  }, [navigate])
 
   if (location.pathname === '/privacy-policy') return <PrivacyPolicyPage />
   if (location.pathname === '/terms-of-service') return <TermsOfServicePage />
